@@ -1,3 +1,8 @@
+"""Preprocess ARTIC-v3 primer set for QCovid amplicon QC pipeline
+this required manual intervention in the source nCoV-2019.tsv for
+nCoV-2019_13_pool1 TCGCACAAATGTCTACTTAGCTGT LEFT
+when using MN908947.
+"""
 ref = ""
 ref_file = "../MN908947.fasta"
 for line in open(ref_file):
@@ -15,7 +20,13 @@ mix = None
 for line in open('nCoV-2019.tsv'):
     name, pool, seq, *rest = line.strip().split('\t')
     if name == 'name':
-        # header
+        # header line
+        continue
+
+    # the primer set includes alternative primers. this is not
+    # relevent when we're just trying to resolve the start and end
+    # positions
+    if 'alt' in name:
         continue
 
     if pool == 'nCoV-2019_1':
@@ -30,11 +41,17 @@ for line in open('nCoV-2019.tsv'):
 
     if name not in amplicons:
         amplicons[name] = [None, None]
-
+    
     if direction == 'RIGHT':
         seq = rc(seq)
+        if seq not in ref:
+            print(name, seq, direction, "not found")
+            raise ValueError 
         amplicons[name][1] = ref.index(seq) + len(seq)
     elif direction == 'LEFT':
+        if seq not in ref:
+            print(name, seq, direction, "not found")
+            raise ValueError
         amplicons[name][0] = ref.index(seq)
 
 for a in amplicons:
