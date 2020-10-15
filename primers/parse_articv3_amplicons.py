@@ -17,7 +17,7 @@ def rc(seq):
 
 amplicons = {}
 mix = None
-for line in open('nCoV-2019.tsv'):
+for line in open('nCoV-2019-MN908947.tsv'):
     name, pool, seq, *rest = line.strip().split('\t')
     if name == 'name':
         # header line

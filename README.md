@@ -36,10 +36,12 @@ Primer sets are not defined consistently and have to be preprocessed into these 
 For reference these scripts and raw primer sets are included in `primers/`. Brief notes follow.
 
 ### Dutch Primal 500-75
-`nCoV-nl-primal500-75.bed`. These were extracted from the supplementary materials for [...], provided in `primers/dutch_primal_amplicons.txt` and preprocessed with the script `primers/parse_nl_amplicons.py`.
+`nCoV-nl-primal500-75.bed`. These were extracted from the supplementary materials for [...], provided in `primers/dutch_primal_amplicons.txt` and preprocessed with the script `primers/parse_nl_amplicons.py`. Note that some of these primers were supplied with IUPAC ambiguous nucleotides which may present an issue with locating them in the reference sequence.
 
 ### ARTIC-v3
-`nCoV-artic-v3.bed`.
+`nCoV-artic-v3.bed`. These primers come from a different reference that matches MW075808. Primer 13 LEFT, `TCGCACAAATGTCTACTTAGCTGT`, cannot be located verbatim in MN908947 but appears at position 3771 in the former reference and is homologous to `TCGCACGAAAGTCTACTTAGCTGT` in ours.
+
+`python parse_articv3_amplicons.py > nCoV-artic-v3.bed`
 
 ## Fetching raw sequencing data
 
@@ -49,30 +51,30 @@ For reference these scripts and raw primer sets are included in `primers/`. Brie
 
 ### Nanopore
 
-* PRJEB37966
-* PRJEB37886  https://www.cogconsortium.uk/protocols/
-* PRJEB38388  https://www.biorxiv.org/content/10.1101/2020.04.21.050633v1.supplementary-material
-* PRJNA613958 https://peerj.com/articles/9255/
-* PRJNA614995 https://peerj.com/articles/9255/
-* PRJNA616147 ARTIC v1 primers
-* PRJNA622817 https://www.cdc.gov/coronavirus/2019-ncov/lab/rt-pcr-panel-primer-probes.html
-* PRJNA627229 https://www.medrxiv.org/content/10.1101/2020.04.25.20079517v1.full.pdf
-* PRJNA610248
-* PRJNA614976 https://doi.org/10.1016/j.cell.2020.04.021
-* PRJNA632678 https://doi.org/10.1128/MRA.00573-20
-* PRJNA601630 https://www.thelancet.com/journals/lancet/article/PIIS0140-6736(20)30154-9/fulltext
-* PRJNA608224 https://www.biorxiv.org/content/10.1101/2020.03.05.976167v1.full
-* PRJNA608242
-* PRJNA612578 https://www.biorxiv.org/content/biorxiv/early/2020/04/12/2020.04.09.034462.full.pdf
-* PRJNA614504 https://europepmc.org/article/med/32676620
-* PRJNA627286 https://onlinelibrary.wiley.com/doi/full/10.1002/jmv.26140
+* `PRJEB37966`
+* `PRJEB37886` ARTIC v3(?) https://www.cogconsortium.uk/protocols/
+* `PRJEB38388` Dutch primers https://www.biorxiv.org/content/10.1101/2020.04.21.050633v1.supplementary-material
+* `PRJNA613958` https://peerj.com/articles/9255/
+* `PRJNA614995` https://peerj.com/articles/9255/
+* `PRJNA616147` ARTIC v1 primers
+* `PRJNA622817` https://www.cdc.gov/coronavirus/2019-ncov/lab/rt-pcr-panel-primer-probes.html
+* `PRJNA627229` https://www.medrxiv.org/content/10.1101/2020.04.25.20079517v1.full.pdf
+* `PRJNA610248`
+* `PRJNA614976` https://doi.org/10.1016/j.cell.2020.04.021
+* `PRJNA632678` https://doi.org/10.1128/MRA.00573-20
+* `PRJNA601630` https://www.thelancet.com/journals/lancet/article/PIIS0140-6736(20)30154-9/fulltext
+* `PRJNA608224` https://www.biorxiv.org/content/10.1101/2020.03.05.976167v1.full
+* `PRJNA608242`
+* `PRJNA612578` https://www.biorxiv.org/content/biorxiv/early/2020/04/12/2020.04.09.034462.full.pdf
+* `PRJNA614504` https://europepmc.org/article/med/32676620
+* `PRJNA627286` https://onlinelibrary.wiley.com/doi/full/10.1002/jmv.26140
 
 ### Illumina
 * TODO
 
 ## Running the pipeline
 
-For single-end reads and the Dutch primers (PRJxxxxxxxxx), one would run:
+For single-end reads and the Dutch primers (PRJEB38388), one would run:
 
 ```bash
 bwa mem MN908947.fasta $PROJECT/$SAMPLE_1.fastq.gz | samtools view -bS - > $WORK/$SAMPLE.MN908947.bam
