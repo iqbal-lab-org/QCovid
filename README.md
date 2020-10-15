@@ -87,4 +87,12 @@ TODO: include run-time estimates, nextflow batching by project
 
 ## Interpreting results
 
-TODO: explain heatmap, lifting over coordinates
+### Collating amplicon depths across a project
+
+TODO: jupyter notebook heatmap
+
+### Per-sample internal consistency
+
+### Investigating cleaned reads
+`bin_amplicons.py` will optionally write reads that positively identify as amplicons to a 'cleaned' sam file.
+
