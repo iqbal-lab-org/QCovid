@@ -29,6 +29,8 @@ for amplicon in amplicons:
     # ensure coords are sorted
     rc = 0
     for read in bam.fetch(reference, start, end):
+        if not read.reference_start or not read.reference_end:
+            continue
         if read.reference_start > (start - 5) and read.reference_end < (end + 5):
             rc += 1 
             filtered.write(read)
