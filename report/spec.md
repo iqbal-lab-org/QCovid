@@ -6,6 +6,7 @@ A summary table:
 95% of the samples have <M positions with failing depth criterion
 Y% of samples have no amplicons drops
 Z% of samples have <=3 amplicon drops
+ZZZ samples are completely excluded due to low quality
 
 
 A single table, which is the concatenate of the per-sample tables. Columns are
