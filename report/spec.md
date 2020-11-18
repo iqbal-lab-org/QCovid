@@ -1,1 +1,27 @@
-create
+## Summary of a dataset
+
+A single table, which is the concatenate of the per-sample tables. Columns are
+
+1. overall depth
+2. number of dropped amplicons (median depth across amplicon <5
+3. Without excluding dropped amps, % of bases with <85% support
+4. Without excluding dropped amps, % of bases with more than 5x depth and <85% support
+5. Without excluding dropped amps, % of bases with <50% support
+6. Without excluding dropped amps, % of bases with more than 5x depth and <50% support
+
+In a future version we will add
+
+7. After excluding dropped amps, % of bases with <85% support
+8. After excluding dropped amps, % of bases with more than 5x depth and  <85% support
+9. After excluding dropped amps, % of bases with <50% support
+10. After excluding dropped amps, % of bases with more than 5x depth and <50% support
+
+Two plots
+
+1. y axis is count of samples. x axis is % of genome with >85% support and 5x depth (without excluding failed amplicons)
+2. y axis is count of samples, x axis is dropped amplicons
+
+## Summary of a technology (all nanopore, or all illumina)
+
+As above. 
+
