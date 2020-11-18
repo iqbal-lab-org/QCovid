@@ -1,5 +1,13 @@
 ## Summary of a dataset
 
+
+A summary table:
+95% of the samples have <N positions failing 85% criterion
+95% of the samples have <M positions with failing depth criterion
+Y% of samples have no amplicons drops
+Z% of samples have <=3 amplicon drops
+
+
 A single table, which is the concatenate of the per-sample tables. Columns are
 
 1. overall depth
@@ -8,6 +16,9 @@ A single table, which is the concatenate of the per-sample tables. Columns are
 4. Without excluding dropped amps, % of bases with more than 5x depth and <85% support
 5. Without excluding dropped amps, % of bases with <50% support
 6. Without excluding dropped amps, % of bases with more than 5x depth and <50% support
+
+
+
 
 In a future version we will add
 
