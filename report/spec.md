@@ -2,7 +2,7 @@
 
 
 A summary table:
-95% of the samples have <N positions failing 85% criterion
+95% of the samples have <N positions failing 85% criterion 
 95% of the samples have <M positions with failing depth criterion
 Y% of samples have no amplicons drops
 Z% of samples have <=3 amplicon drops
@@ -32,6 +32,7 @@ Two plots
 
 1. y axis is count of samples. x axis is % of genome with >85% support and 5x depth (without excluding failed amplicons)
 2. y axis is count of samples, x axis is dropped amplicons
+3. histogram of amplicon numbers and counts of how often dropped.
 
 ## Summary of a technology (all nanopore, or all illumina)
 
