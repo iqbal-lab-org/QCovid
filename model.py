@@ -8,8 +8,8 @@ Base = declarative_base()
 class Dataset(Base):
     __tablename__ = 'dataset'
     id = Column(Integer, primary_key=True)
-    ena_id = Column(String)
-    project_title = Column(String)
+    ena_id = Column(String(20))
+    project_title = Column(String(200))
     runs = relationship("Run", back_populates="dataset")
 
 
@@ -21,7 +21,7 @@ class Platform(Base):
 class Run(Base):
     __tablename__ = 'run'
     id = Column(Integer, primary_key=True)
-    run_id = Column(String)
+    run_id = Column(String(20))
     dataset_id = Column(Integer, ForeignKey('dataset.id'))
     #assemblies = relationship("Assembly", back_populates="run")
     dataset = relationship("Dataset", back_populates="runs")
@@ -32,8 +32,8 @@ class SingleReads(Base):
     run_id = Column(Integer, ForeignKey('run.id'))
     assembly_id = Column(Integer, ForeignKey('assembly.id'))
 
-    uri = Column(String)
-    md5 = Column(String)
+    uri = Column(String(200))
+    md5 = Column(String(32))
 
 
 class PairedReads(Base):
@@ -42,20 +42,20 @@ class PairedReads(Base):
     run_id = Column(Integer, ForeignKey('run.id'))
     assembly_id = Column(Integer, ForeignKey('assembly.id'))
 
-    r1_uri = Column(String)
-    r1_md5 = Column(String)
+    r1_uri = Column(String(200))
+    r1_md5 = Column(String(32))
 
-    r2_uri = Column(String)
-    r2_md5 = Column(String)
+    r2_uri = Column(String(200))
+    r2_md5 = Column(String(32))
 
 
 class Assembly(Base):
     __tablename__ = 'assembly'
     id = Column(Integer, primary_key=True)
     run_id = Column(Integer, ForeignKey('run.id'))
-    name = Column(String)
-    description = Column(String)
-    sequence = Column(String)
+    name = Column(String(256))
+    description = Column(String(500))
+    sequence = Column(String(33000))
 
 class SelfQC(Base):
     __tablename__ = 'self_qc'
@@ -71,4 +71,4 @@ class AmpliconQC(Base):
 class PrimerSet(Base):
     __tablename__ = 'primers'
     id = Column(Integer, primary_key=True)
-    name = Column(String)
+    name = Column(String(200))

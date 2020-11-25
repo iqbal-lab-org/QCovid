@@ -28,8 +28,33 @@ def illumina_metadata_batch1(session, p='../nov3/ILLUMINA_Metadata_Batch1.tsv'):
         prj.runs.append(run)
         count += 1
         session.add(run)
-    print(f"adding {count} runs")
+    print(f"adding {count} illumina runs")
     session.commit()
+
+def nanopore_metadata(session, p='../oct5/OXFORD_NANOPORE_Metadata.tsv'):
+    projects = set()
+    count = 0
+    for l in open(p):
+        project, sample, _, _, run_id, project_title, *rest = l.strip().split('\t')
+        if project == 'project_id':
+            continue
+
+        if project not in projects:
+            dataset = Dataset(ena_id=project, project_title=project_title)
+            session.add(dataset)
+            projects.add(project)
+            session.commit()
+        
+        prjs = list(session.query(Dataset).filter(Dataset.ena_id==project))
+        assert len(prjs) == 1
+        prj = prjs[0]
+        run = Run(run_id=run_id, dataset_id=prj)
+        prj.runs.append(run)
+        count += 1
+        session.add(run)
+    print(f"adding {count} nanopore runs")
+    session.commit()
+
 
 def nov3_assemblies(session, p='../nov3/*.fa'):
     count = 0
@@ -60,8 +85,6 @@ def nov3_assemblies(session, p='../nov3/*.fa'):
         session.add(assembly)
 
         count += 1
-        if count > 30:
-            break
     print(f"loaded {count} assemblies")
     session.commit()
 
@@ -94,8 +117,6 @@ def oct5_assemblies(session, p='../oct5/*.fasta'):
         session.add(assembly)
 
         count += 1
-        if count > 30:
-            break
     print(f"loaded {count} assemblies")
     session.commit()
 
@@ -117,7 +138,10 @@ if __name__=="__main__":
     
     session = Session()
     
-    illumina_metadata_batch1(session, p='../nov3/smol_md.tsv') 
-    nov3_assemblies(session)
+    illumina_metadata_batch1(session)#, p='../nov3/smol_md.tsv') 
+    nanopore_metadata(session)
+    
+    oct5_assemblies(session)
 
+    nov3_assemblies(session)
     session.close()
