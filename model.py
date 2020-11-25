@@ -23,7 +23,8 @@ class Run(Base):
     id = Column(Integer, primary_key=True)
     run_id = Column(String)
     dataset_id = Column(Integer, ForeignKey('dataset.id'))
-    assemblies = relationship("Assembly")
+    #assemblies = relationship("Assembly", back_populates="run")
+    dataset = relationship("Dataset", back_populates="runs")
 
 class SingleReads(Base):
     __tablename__ = 'se_reads'
@@ -55,7 +56,6 @@ class Assembly(Base):
     name = Column(String)
     description = Column(String)
     sequence = Column(String)
-
 
 class SelfQC(Base):
     __tablename__ = 'self_qc'
