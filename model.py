@@ -41,6 +41,7 @@ class PairedReads(Base):
     id = Column(Integer, primary_key=True)
     run_id = Column(Integer, ForeignKey('run.id'))
     assembly_id = Column(Integer, ForeignKey('assembly.id'))
+    selfqc_id = Column(Integer, ForeignKey('self_qc.id'))
 
     r1_uri = Column(String(200))
     r1_md5 = Column(String(32))
@@ -61,14 +62,38 @@ class SelfQC(Base):
     __tablename__ = 'self_qc'
     id = Column(Integer, primary_key=True)
     assembly_id = Column(Integer, ForeignKey('assembly.id'))
+    version = Column(String(16))
+    f_95 = Column(Integer)
+    f_90 = Column(Integer)
+    f_85 = Column(Integer)
+    f_80 = Column(Integer)
+    f_75 = Column(Integer)
+    f_00 = Column(Integer)
+    ns = Column(Integer)
+    dashes = Column(Integer)
+    bases = Column(Integer)
 
 
 class AmpliconQC(Base):
     __tablename__ = 'amplicon_qc'
+    version = Column(String(16))
     id = Column(Integer, primary_key=True)
+    primerset_id = Column(Integer, ForeignKey('primers.id'))
+    assembly_id = Column(Integer, ForeignKey('assembly.id'))
     
 
 class PrimerSet(Base):
     __tablename__ = 'primers'
     id = Column(Integer, primary_key=True)
     name = Column(String(200))
+
+class Amplicon(Base):
+    __tablename__ = 'amplicon'
+    id = Column(Integer, primary_key=True)
+    primerset_id = Column(Integer, ForeignKey('primers.id'))
+    name = Column(String(50))
+    fwd = Column(String(100))
+    rev = Column(String(100))
+    pool = Column(String(16))
+    start = Column(Integer)
+    end = Column(Integer)
