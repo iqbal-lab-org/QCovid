@@ -46,7 +46,8 @@ def nanopore_metadata(session, p='../oct5/OXFORD_NANOPORE_Metadata.tsv'):
             session.commit()
         
         prjs = list(session.query(Dataset).filter(Dataset.ena_id==project))
-        assert len(prjs) == 1
+        if len(prjs) != 1:
+            continue
         prj = prjs[0]
         run = Run(run_id=run_id, dataset_id=prj)
         prj.runs.append(run)
@@ -138,10 +139,10 @@ if __name__=="__main__":
     
     session = Session()
     
-    illumina_metadata_batch1(session)#, p='../nov3/smol_md.tsv') 
-    nanopore_metadata(session)
+#    illumina_metadata_batch1(session)#, p='../nov3/smol_md.tsv') 
+#    nanopore_metadata(session)
     
-    oct5_assemblies(session)
+#    oct5_assemblies(session)
 
-    nov3_assemblies(session)
+#    nov3_assemblies(session)
     session.close()

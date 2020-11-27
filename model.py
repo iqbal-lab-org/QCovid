@@ -13,24 +13,25 @@ class Dataset(Base):
     runs = relationship("Run", back_populates="dataset")
 
 
-class Platform(Base):
-    __tablename__ = 'platform'
-    id = Column(Integer, primary_key=True)
-
-
 class Run(Base):
     __tablename__ = 'run'
     id = Column(Integer, primary_key=True)
-    run_id = Column(String(20))
+    ena_id = Column(String(20))
     dataset_id = Column(Integer, ForeignKey('dataset.id'))
-    #assemblies = relationship("Assembly", back_populates="run")
+    dataset = relationship("Dataset", uselist=False, back_populates="runs")
+
+    assemblies = relationship("Assembly", back_populates="run")
+
     dataset = relationship("Dataset", back_populates="runs")
+    se_reads = relationship("SingleReads", uselist=False, back_populates="run")
+    pe_reads = relationship("PairedReads", uselist=False, back_populates="run")
+
 
 class SingleReads(Base):
     __tablename__ = 'se_reads'
     id = Column(Integer, primary_key=True)
     run_id = Column(Integer, ForeignKey('run.id'))
-    assembly_id = Column(Integer, ForeignKey('assembly.id'))
+    run = relationship("Run", back_populates="se_reads")
 
     uri = Column(String(200))
     md5 = Column(String(32))
@@ -40,8 +41,7 @@ class PairedReads(Base):
     __tablename__ = 'pe_reads'
     id = Column(Integer, primary_key=True)
     run_id = Column(Integer, ForeignKey('run.id'))
-    assembly_id = Column(Integer, ForeignKey('assembly.id'))
-    selfqc_id = Column(Integer, ForeignKey('self_qc.id'))
+    run = relationship("Run", back_populates="pe_reads")
 
     r1_uri = Column(String(200))
     r1_md5 = Column(String(32))
@@ -54,9 +54,14 @@ class Assembly(Base):
     __tablename__ = 'assembly'
     id = Column(Integer, primary_key=True)
     run_id = Column(Integer, ForeignKey('run.id'))
+    run = relationship("Run", back_populates="assemblies")
+
     name = Column(String(256))
     description = Column(String(500))
     sequence = Column(String(33000))
+
+    mask = relationship("Mask", back_populates="assembly")
+
 
 class SelfQC(Base):
     __tablename__ = 'self_qc'
@@ -65,7 +70,7 @@ class SelfQC(Base):
     version = Column(String(16))
     f_95 = Column(Integer)
     f_90 = Column(Integer)
-    f_85 = Column(Integer)
+    #f_85 = Column(Integer)
     f_80 = Column(Integer)
     f_75 = Column(Integer)
     f_00 = Column(Integer)
@@ -74,23 +79,44 @@ class SelfQC(Base):
     bases = Column(Integer)
 
 
+class Mask(Base):
+    __tablename__ = "mask"
+    id = Column(Integer, primary_key=True)
+    assembly_id = Column(Integer, ForeignKey('assembly.id'))
+    assembly = relationship("Assembly", back_populates="mask")
+    criteria = Column(String(200))
+    ref = Column(String(10))
+    depth = Column(Integer)
+    support = Column(Integer)
+    position = Column(Integer)
+
+
 class AmpliconQC(Base):
     __tablename__ = 'amplicon_qc'
+    amplicon_id = Column(Integer, ForeignKey('amplicon.id'), primary_key=True)
+    run_id = Column(Integer, ForeignKey('run.id'), primary_key=True)
+  
+    amplicons = relationship("Amplicon", back_populates="amplicon_qcs")
+    runs = relationship("Run", back_populates="amplicon_qcs")
+
+    reads = Column(Integer)
     version = Column(String(16))
-    id = Column(Integer, primary_key=True)
-    primerset_id = Column(Integer, ForeignKey('primers.id'))
-    assembly_id = Column(Integer, ForeignKey('assembly.id'))
-    
+
 
 class PrimerSet(Base):
-    __tablename__ = 'primers'
+    __tablename__ = 'primerset'
     id = Column(Integer, primary_key=True)
     name = Column(String(200))
+    version = Column(String(20))
+
+    amplicons = relationship("Amplicon", back_populates="primerset")
+
 
 class Amplicon(Base):
     __tablename__ = 'amplicon'
     id = Column(Integer, primary_key=True)
-    primerset_id = Column(Integer, ForeignKey('primers.id'))
+    primerset_id = Column(Integer, ForeignKey('primerset.id'))
+    primerset = relationship("PrimerSet", back_populates="amplicons")
     name = Column(String(50))
     fwd = Column(String(100))
     rev = Column(String(100))
