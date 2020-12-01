@@ -3,56 +3,62 @@ from glob import glob
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
 
-from model import Dataset, Run, Assembly
+from model import Dataset, Run, Assembly, PrimerSet, Amplicon, SelfQC
 import model
 
+VERSION = '0.0.1'
 
 def illumina_metadata_batch1(session, p='../nov3/ILLUMINA_Metadata_Batch1.tsv'):
-    projects = set()
     count = 0
     for l in open(p):
-        _, project, sample, _, _, run, project_title, *rest = l.strip().split('\t')
+        _, project, sample, _, _, run_id, project_title, *rest = l.strip().split('\t')
         if project == 'sample_id':
             continue
-
-        if project not in projects:
-            dataset = Dataset(ena_id=project, project_title=project_title)
-            session.add(dataset)
-            projects.add(project)
-            session.commit()
         
         prjs = list(session.query(Dataset).filter(Dataset.ena_id==project))
+        if len(prjs) == 0:
+            dataset = Dataset(ena_id=project, project_title=project_title)
+            prj = dataset
+            session.add(dataset)
+            session.commit()
+        prjs = list(session.query(Dataset).filter(Dataset.ena_id==project))
+
         assert len(prjs) == 1
         prj = prjs[0]
-        run = Run(run_id=run, dataset_id=prj)
-        prj.runs.append(run)
-        count += 1
-        session.add(run)
+       
+        runq = session.query(Run).filter_by(ena_id=run_id).first()
+        if not runq:
+            run = Run(ena_id=run_id, dataset_id=prj)
+            prj.runs.append(run)
+            count += 1
+            session.add(run)
+
     print(f"adding {count} illumina runs")
     session.commit()
 
 def nanopore_metadata(session, p='../oct5/OXFORD_NANOPORE_Metadata.tsv'):
-    projects = set()
     count = 0
     for l in open(p):
         project, sample, _, _, run_id, project_title, *rest = l.strip().split('\t')
         if project == 'project_id':
             continue
 
-        if project not in projects:
+        prjs = list(session.query(Dataset).filter(Dataset.ena_id==project))
+        if len(prjs) == 0:
             dataset = Dataset(ena_id=project, project_title=project_title)
             session.add(dataset)
-            projects.add(project)
             session.commit()
-        
         prjs = list(session.query(Dataset).filter(Dataset.ena_id==project))
-        if len(prjs) != 1:
-            continue
+        assert len(prjs) == 1
         prj = prjs[0]
-        run = Run(run_id=run_id, dataset_id=prj)
-        prj.runs.append(run)
-        count += 1
-        session.add(run)
+
+        runq = session.query(Run).filter_by(ena_id=run_id).first()
+        if not runq:
+            run = Run(ena_id=run_id, dataset_id=prj)
+            prj.runs.append(run)
+            count += 1
+            session.add(run)
+
     print(f"adding {count} nanopore runs")
     session.commit()
 
@@ -62,8 +68,8 @@ def nov3_assemblies(session, p='../nov3/*.fa'):
     for fasta in glob(p):
         description = None
         seq = None
-        name = fasta.split('/')[-1]
-        sample = name.split('.')[0].split('_')[0]
+        name = fasta.split('/')[-1].split('.')[0]
+        sample = name.split('_')[0]
         with open(fasta) as fd:
             ls = 0
             for l in fd:
@@ -75,17 +81,13 @@ def nov3_assemblies(session, p='../nov3/*.fa'):
             if ls > 2:
                 print("error")
                 continue
-        rs = list(session.query(Run).filter(Run.run_id==sample))
-        if len(rs) == 0:
-            continue
-        assert len(rs) == 1
-
-        run = rs[0]
+        run = session.query(Run).filter(Run.ena_id==sample).first()
+        if run:
         #sample = Run(ena_id=name)
-        assembly = Assembly(description=description, name=name, sequence=seq, run_id=run.id)
-        session.add(assembly)
+            assembly = Assembly(description=description, name=name, sequence=seq, run_id=run.id)
+            session.add(assembly)
 
-        count += 1
+            count += 1
     print(f"loaded {count} assemblies")
     session.commit()
 
@@ -94,8 +96,8 @@ def oct5_assemblies(session, p='../oct5/*.fasta'):
     for fasta in glob(p):
         description = None
         seq = None
-        name = fasta.split('/')[-1]
-        sample = name.split('.')[0].split('_')[0]
+        name = fasta.split('/')[-1].split('.')[0]
+        sample = name.split('_')[0]
         with open(fasta) as fd:
             ls = 0
             for l in fd:
@@ -107,42 +109,103 @@ def oct5_assemblies(session, p='../oct5/*.fasta'):
             if ls > 2:
                 print("error")
                 continue
-        rs = list(session.query(Run).filter(Run.run_id==sample))
-        if len(rs) == 0:
-            continue
-        assert len(rs) == 1
+        run = session.query(Run).filter(Run.ena_id==sample).first()
+        if run:
+            assembly = Assembly(description=description, name=name, sequence=seq, run_id=run.id)
+            session.add(assembly)
 
-        run = rs[0]
-        #sample = Run(ena_id=name)
-        assembly = Assembly(description=description, name=name, sequence=seq, run_id=run.id)
-        session.add(assembly)
-
-        count += 1
+            count += 1
     print(f"loaded {count} assemblies")
     session.commit()
 
+def add_amplicons(session, bed, name=None):
+    amplicons = []
+    if name is None:
+        name = bed.split('.')[0].split('/')[-1]
+
+    if session.query(PrimerSet).filter(PrimerSet.name==name).first():
+        print(f"primerset {name} already loaded. skipping.")
+        return
+
+    pset = PrimerSet(reference='MN908947', name=name, version=VERSION)
+    session.add(pset)
+    count = 0
+    for line in open(bed):
+        if line[0] == '#':
+            continue
+
+        n, start, end = line.strip().split('\t')
+        start = int(start)
+        end = int(end)
+        amplicon = Amplicon(primerset_id=pset.id, name=n, start=start, end=end)
+        session.add(amplicon)
+        count += 1
+
+    print(f"loaded primerset {name}, {count} amplicons")
+    session.commit()
+
+def add_self_qc(session, fn):
+    count = 0
+    for line in open(fn):
+        if line[0] == '#':
+            continue
+        sample, f_95, f_90, f_80, f_75, f_00, ma_30, ns, dashes = line.strip().split(',')
+
+        run = session.query(Run).filter(Run.ena_id==sample).first()
+        if not run:
+            continue
+        print("sample exists")
+        assembly = session.query(Assembly).filter(Assembly.run_id==run.id).first()
+        if assembly:
+            qcs = SelfQC(assembly_id=assembly.id, version=VERSION, f_95=int(f_95),\
+                    f_90=int(f_90), f_80=int(f_80), f_75=int(f_75), f_00=int(f_00),\
+                    ma_30 = int(ma_30), ns=int(ns), dashes=int(dashes))
+            session.add(qcs)
+            count += 1
+    print(f"added {count} lines of self-QC")
+    session.commit()
+    
 
 def load_illumina_selfqc_batch1(session, p=''):
     for fn in glob.glob(p):
         pass
 
 if __name__=="__main__":
-    if len(sys.argv) < 2:
-        db = 'sqlite://'
-    else:
-        db = sys.argv[1]
-    engine = create_engine(db)
-
     Session = sessionmaker()
-    Session.configure(bind=engine)
-    model.Base.metadata.create_all(engine)
-    
+    if len(sys.argv) == 3:
+        if sys.argv[1] == 'init':
+            engine = create_engine(sys.argv[2])
+
+            Session.configure(bind=engine)
+            model.Base.metadata.create_all(engine)
+            session = Session()
+            session.close()
+            exit()
+        else:
+            print("unknown option")
+            exit(1)
+     
+    elif len(sys.argv) < 2:
+        engine = create_engine('sqlite://')
+
+        model.Base.metadata.create_all(engine)
+        Session.configure(bind=engine)
+
+    else:
+        engine = create_engine(sys.argv[1])
+        Session.configure(bind=engine)
+     
     session = Session()
     
-#    illumina_metadata_batch1(session)#, p='../nov3/smol_md.tsv') 
-#    nanopore_metadata(session)
-    
-#    oct5_assemblies(session)
+    nanopore_metadata(session)#, p='../oct5/smol_md.tsv')
+    illumina_metadata_batch1(session, p='../nov3/smol_md.tsv') 
+   
+    add_amplicons(session, 'primers/nCoV-nl-primal500-75.bed')
+    add_amplicons(session, 'primers/nCoV-artic-v3.bed')
 
-#    nov3_assemblies(session)
+    oct5_assemblies(session)
+
+    nov3_assemblies(session)
+
+    add_self_qc(session, '../nl_cohort_qc.csv')
     session.close()

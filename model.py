@@ -21,6 +21,7 @@ class Run(Base):
     dataset = relationship("Dataset", uselist=False, back_populates="runs")
 
     assemblies = relationship("Assembly", back_populates="run")
+    amplicon_qcs = relationship("AmpliconQC", back_populates="runs")
 
     dataset = relationship("Dataset", back_populates="runs")
     se_reads = relationship("SingleReads", uselist=False, back_populates="run")
@@ -70,10 +71,11 @@ class SelfQC(Base):
     version = Column(String(16))
     f_95 = Column(Integer)
     f_90 = Column(Integer)
-    #f_85 = Column(Integer)
+    f_85 = Column(Integer)
     f_80 = Column(Integer)
     f_75 = Column(Integer)
     f_00 = Column(Integer)
+    ma_30 = Column(Integer)
     ns = Column(Integer)
     dashes = Column(Integer)
     bases = Column(Integer)
@@ -108,6 +110,7 @@ class PrimerSet(Base):
     id = Column(Integer, primary_key=True)
     name = Column(String(200))
     version = Column(String(20))
+    reference = Column(String(100))
 
     amplicons = relationship("Amplicon", back_populates="primerset")
 
@@ -117,6 +120,7 @@ class Amplicon(Base):
     id = Column(Integer, primary_key=True)
     primerset_id = Column(Integer, ForeignKey('primerset.id'))
     primerset = relationship("PrimerSet", back_populates="amplicons")
+    amplicon_qcs = relationship("AmpliconQC", back_populates="amplicons")
     name = Column(String(50))
     fwd = Column(String(100))
     rev = Column(String(100))
