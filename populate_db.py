@@ -3,7 +3,7 @@ from glob import glob
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
 
-from model import Dataset, Run, Assembly, PrimerSet, Amplicon, SelfQC
+from model import Dataset, Run, Assembly, PrimerSet, Amplicon, SelfQC, AmpliconQC
 import model
 
 VERSION = '0.0.1'
@@ -154,7 +154,6 @@ def add_self_qc(session, fn):
         run = session.query(Run).filter(Run.ena_id==sample).first()
         if not run:
             continue
-        print("sample exists")
         assembly = session.query(Assembly).filter(Assembly.run_id==run.id).first()
         if assembly:
             qcs = SelfQC(assembly_id=assembly.id, version=VERSION, f_95=int(f_95),\
@@ -164,7 +163,30 @@ def add_self_qc(session, fn):
             count += 1
     print(f"added {count} lines of self-QC")
     session.commit()
-    
+
+def add_amplicon_qc(session, fn, primerset=None):
+    count = 0
+    header = None
+    for line in open(fn):
+        if line[0] == '#':
+            _, *header = line.strip().split(',')
+            continue
+
+        sample, *depths = line.strip().split(',')
+
+        run = session.query(Run).filter(Run.ena_id==sample).first()
+        if not run:
+            continue
+
+        for amplicon_name, depth in zip(header, depths):
+            depth = int(depth)
+            amplicon = session.query(Amplicon).filter(Amplicon.name==amplicon_name).first()
+            assert amplicon
+            aqc = AmpliconQC(amplicon_id=amplicon.id, run_id=run.id, reads=depth, version=VERSION)
+            session.add(aqc)
+        session.commit()
+        count += 1
+    print(f"added amplicon QC for {count} runs")
 
 def load_illumina_selfqc_batch1(session, p=''):
     for fn in glob.glob(p):
@@ -203,6 +225,7 @@ if __name__=="__main__":
     add_amplicons(session, 'primers/nCoV-nl-primal500-75.bed')
     add_amplicons(session, 'primers/nCoV-artic-v3.bed')
 
+    add_amplicon_qc(session, '../se_nl-primal.csv')
     oct5_assemblies(session)
 
     nov3_assemblies(session)
