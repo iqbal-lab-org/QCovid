@@ -220,13 +220,15 @@ if __name__=="__main__":
     session = Session()
     
     nanopore_metadata(session)#, p='../oct5/smol_md.tsv')
-    illumina_metadata_batch1(session, p='../nov3/smol_md.tsv') 
+    illumina_metadata_batch1(session)#, p='../nov3/smol_md.tsv') 
    
     add_amplicons(session, 'primers/nCoV-nl-primal500-75.bed')
     add_amplicons(session, 'primers/nCoV-artic-v3.bed')
 
     add_amplicon_qc(session, '../se_nl-primal.csv')
+    add_amplicon_qc(session, '../se_artic-v3.csv')
     oct5_assemblies(session)
+    
 
     nov3_assemblies(session)
 
