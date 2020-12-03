@@ -166,6 +166,7 @@ def add_self_qc(session, fn):
 
 def add_amplicon_qc(session, fn, primerset=None):
     count = 0
+    skipped = 0
     header = None
     for line in open(fn):
         if line[0] == '#':
@@ -182,11 +183,14 @@ def add_amplicon_qc(session, fn, primerset=None):
             depth = int(depth)
             amplicon = session.query(Amplicon).filter(Amplicon.name==amplicon_name).first()
             assert amplicon
+            if session.query(AmpliconQC).filter(AmpliconQC.amplicon_id==amplicon.id, AmpliconQC.run_id==run.id, AmpliconQC.version==VERSION).first():
+                skipped += 1
+                continue
             aqc = AmpliconQC(amplicon_id=amplicon.id, run_id=run.id, reads=depth, version=VERSION)
             session.add(aqc)
         session.commit()
         count += 1
-    print(f"added amplicon QC for {count} runs")
+    print(f"added amplicon QC for {count} runs (skipped {skipped} QC rows)")
 
 def load_illumina_selfqc_batch1(session, p=''):
     for fn in glob.glob(p):
@@ -228,8 +232,6 @@ if __name__=="__main__":
     add_amplicon_qc(session, '../se_nl-primal.csv')
     add_amplicon_qc(session, '../se_artic-v3.csv')
     oct5_assemblies(session)
-    
-
     nov3_assemblies(session)
 
     add_self_qc(session, '../nl_cohort_qc.csv')

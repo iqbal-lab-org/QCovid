@@ -1,11 +1,14 @@
+"""Declarative datamodel for covid assembly QC reporting pipeline
+"""
 from sqlalchemy import Column, ForeignKey, Integer, String
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import relationship
-from sqlalchemy import create_engine
 
 Base = declarative_base()
 
 class Dataset(Base):
+    """Datasets map to ENA projects. Have many Runs.
+    """
     __tablename__ = 'dataset'
     id = Column(Integer, primary_key=True)
     ena_id = Column(String(20))
@@ -14,6 +17,8 @@ class Dataset(Base):
 
 
 class Run(Base):
+    """A sequencing run for a single SAR-CoV-2 sample.
+    """
     __tablename__ = 'run'
     id = Column(Integer, primary_key=True)
     ena_id = Column(String(20))
@@ -29,6 +34,8 @@ class Run(Base):
 
 
 class SingleReads(Base):
+    """Single end reads (i.e. Nanopore)
+    """
     __tablename__ = 'se_reads'
     id = Column(Integer, primary_key=True)
     run_id = Column(Integer, ForeignKey('run.id'))
@@ -39,6 +46,8 @@ class SingleReads(Base):
 
 
 class PairedReads(Base):
+    """Paired end reads (i.e. Illumina)
+    """
     __tablename__ = 'pe_reads'
     id = Column(Integer, primary_key=True)
     run_id = Column(Integer, ForeignKey('run.id'))
@@ -52,6 +61,8 @@ class PairedReads(Base):
 
 
 class Assembly(Base):
+    """A complete 30k+ bp assembly derived from a sequencing run
+    """
     __tablename__ = 'assembly'
     id = Column(Integer, primary_key=True)
     run_id = Column(Integer, ForeignKey('run.id'))
@@ -65,6 +76,8 @@ class Assembly(Base):
 
 
 class SelfQC(Base):
+    """Self consistency metrics for an assembly, given original reads
+    """
     __tablename__ = 'self_qc'
     id = Column(Integer, primary_key=True)
     assembly_id = Column(Integer, ForeignKey('assembly.id'))
@@ -82,6 +95,8 @@ class SelfQC(Base):
 
 
 class Mask(Base):
+    """Actionable mask to be applied to poor regions of an assembly
+    """
     __tablename__ = "mask"
     id = Column(Integer, primary_key=True)
     assembly_id = Column(Integer, ForeignKey('assembly.id'))
@@ -94,10 +109,12 @@ class Mask(Base):
 
 
 class AmpliconQC(Base):
+    """Performance of an individual amplicon in a sequencing run
+    """
     __tablename__ = 'amplicon_qc'
     amplicon_id = Column(Integer, ForeignKey('amplicon.id'), primary_key=True)
     run_id = Column(Integer, ForeignKey('run.id'), primary_key=True)
-  
+
     amplicons = relationship("Amplicon", back_populates="amplicon_qcs")
     runs = relationship("Run", back_populates="amplicon_qcs")
 
@@ -106,6 +123,8 @@ class AmpliconQC(Base):
 
 
 class PrimerSet(Base):
+    """Groups of amplicons
+    """
     __tablename__ = 'primerset'
     id = Column(Integer, primary_key=True)
     name = Column(String(200))
@@ -116,6 +135,8 @@ class PrimerSet(Base):
 
 
 class Amplicon(Base):
+    """Single amplicon from a primer set
+    """
     __tablename__ = 'amplicon'
     id = Column(Integer, primary_key=True)
     primerset_id = Column(Integer, ForeignKey('primerset.id'))
