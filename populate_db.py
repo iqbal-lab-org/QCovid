@@ -3,7 +3,7 @@ from glob import glob
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
 
-from model import Dataset, Run, Assembly, PrimerSet, Amplicon, SelfQC, AmpliconQC
+from model import Dataset, Run, Assembly, PrimerSet, Amplicon, SelfQC, AmpliconQC, PairedReads, SingleReads
 import model
 
 VERSION = '0.0.1'
@@ -129,6 +129,7 @@ def add_amplicons(session, bed, name=None):
 
     pset = PrimerSet(reference='MN908947', name=name, version=VERSION)
     session.add(pset)
+    session.commit()
     count = 0
     for line in open(bed):
         if line[0] == '#':
@@ -163,6 +164,58 @@ def add_self_qc(session, fn):
             count += 1
     print(f"added {count} lines of self-QC")
     session.commit()
+
+def add_pe(session, fn='../crawl_prj_PE.o', pes='../nov3/ILLUMINA_Metadata_Batch1.tsv'):
+    runs = set()
+    for l in open(pes):
+        runs.add(l.strip().split('\t')[5])
+
+    count = 0
+    for line in open(fn):
+        prj, run, fq1, fq2 = line.strip().split(',')
+        if run not in runs:
+            continue
+
+        run = session.query(Run).filter(Run.ena_id==run).first()
+        if not run:
+            continue
+
+        pe_ = session.query(PairedReads).filter(PairedReads.run_id==run.id).first()
+        if pe_:
+            continue
+
+        pe = PairedReads(run_id=run.id, r1_uri=fq1, r2_uri=fq2)
+        session.add(pe)
+        count += 1
+    print(f"added {count} paired end reads")
+    session.commit()
+
+def add_se(session, fn='../crawl_prj_SE.o', ses='../oct5/OXFORD_NANOPORE_Metadata.tsv'):
+    runs = set()
+    for l in open(ses):
+        runs.add(l.strip().split('\t')[4])
+
+    count = 0
+    for line in open(fn):
+        prj, run, fq = line.strip().split(',')
+        fq = fq[2:-2]
+        if run not in runs:
+            continue
+
+        run = session.query(Run).filter(Run.ena_id==run).first()
+        if not run:
+            continue
+
+        se_ = session.query(SingleReads).filter(SingleReads.run_id==run.id).first()
+        if se_:
+            continue
+
+        se = SingleReads(run_id=run.id, uri=fq)
+        session.add(se)
+        count += 1
+    print(f"added {count} single end reads")
+    session.commit()
+
 
 def add_amplicon_qc(session, fn, primerset=None):
     count = 0
@@ -223,16 +276,19 @@ if __name__=="__main__":
      
     session = Session()
     
-    nanopore_metadata(session)#, p='../oct5/smol_md.tsv')
-    illumina_metadata_batch1(session)#, p='../nov3/smol_md.tsv') 
+#    nanopore_metadata(session)#, p='../oct5/smol_md.tsv')
+#    illumina_metadata_batch1(session)#, p='../nov3/smol_md.tsv') 
    
-    add_amplicons(session, 'primers/nCoV-nl-primal500-75.bed')
-    add_amplicons(session, 'primers/nCoV-artic-v3.bed')
+#    add_amplicons(session, 'primers/nCoV-nl-primal500-75.bed')
+#    add_amplicons(session, 'primers/nCoV-artic-v3.bed')
 
-    add_amplicon_qc(session, '../se_nl-primal.csv')
-    add_amplicon_qc(session, '../se_artic-v3.csv')
-    oct5_assemblies(session)
-    nov3_assemblies(session)
+#    add_amplicon_qc(session, '../se_nl-primal.csv')
+#    add_amplicon_qc(session, '../se_artic-v3.csv')
+ #   oct5_assemblies(session)
+ #   nov3_assemblies(session)
 
-    add_self_qc(session, '../nl_cohort_qc.csv')
+ #   add_self_qc(session, '../nl_cohort_qc.csv')
+
+    add_pe(session)
+    add_se(session)
     session.close()
