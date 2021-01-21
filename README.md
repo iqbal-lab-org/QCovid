@@ -6,6 +6,14 @@ This QC pipeline considers raw sequencing data and is flexible over:
 * Single vs. paired reads (i.e. Nanopore vs. Illumina)
 * Amplicon primers
 
+
+# What does this code do for a sample?
+
+1. Per sample, map reads to the reference and mark positions which do not have read support (useful for looking for amplicon dropout)
+2. PEr consensus assembly, map reads to the consensus and mask positions which do not have read support
+
+
+
 ## Single and Paired read pipelines
 
 We use `bwa` to map reads as part of the pipeline. Downstream analysis of the mapping is agnostic to mate pairing.
