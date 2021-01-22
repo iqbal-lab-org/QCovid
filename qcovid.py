@@ -93,22 +93,37 @@ def do_se(session, out):
             print(f"missing paired reads for {no_reads} runs. already have QC for {has_qc}. {score} PE reads with no QC")
 
 parser = argparse.ArgumentParser(description='')
+parser.add_argument('db')
 
-parser.add_argument('init')
-parser.add_argument('project')
-parser.add_argument('load')
-parser.add_argument('run')
-parser.add_argument('report')
+subargs = parser.add_subparsers(dest='command')
+
+init_args = subargs.add_parser('init')
+
+prj_args = subargs.add_parser('project')
+
+load_args = subargs.add_parser('load')
+load_args.add_argument('dataset')
+
+run_args = subargs.add_parser('run')
+
+report_args = subargs.add_parser('report')
+
+dump_args = subargs.add_parser('dump')
 
 if __name__=="__main__":
 
+    args = parser.parse_args()
+
     Session = sessionmaker()
-    engine = create_engine(sys.argv[1])
+    engine = create_engine(args.db)
     Session.configure(bind=engine)
      
     session = Session()
 
-    crawl_ena_download(session, "/tmp", sys.argv[2])
+    if args.command == 'load':
+        crawl_ena_download(session, "/tmp", sys.argv[2])
+    elif parser.command == 'init':
+        exit(1)
 #    out = open('se_jobs.sh', 'w')
 #    do_se(session, out) 
 #    out.close() 
