@@ -1,10 +1,33 @@
 # QCovid
 QC pipelines for sars-cov-2 sequence+consensus submitted to the ENA
 
+# What does this code do?
+
+Provides basic QC information on where in the reference genome there is/not coverage.
+Provides masks of a consensus assembly, showing which bases are supported by the majority of reads (the proportion is a parameter)
+
+The processing therefore splits into two streams
+
+1. Per sample, map reads to the reference and mark positions which do not have read support 
+   If the user has provided information on the primer set used, this is used to infer which amplicons have dropped out.
+   If the user has not provided primer information, generic pseudo-primer windows are tiles across the genome, and we measure which
+   of those have been dropped.
+2. Per consensus assembly, map reads to the consensus and mask positions which do not have read support
+
+All data written to a SQL database, including the masks.
+
+# What precisely is the output
+See the outpur/spec.md file
+
+## Details
+
 This QC pipeline considers raw sequencing data and is flexible over:
 
 * Single vs. paired reads (i.e. Nanopore vs. Illumina)
 * Amplicon primers
+
+
+
 
 ## Single and Paired read pipelines
 
