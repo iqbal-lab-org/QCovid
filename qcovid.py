@@ -3,6 +3,8 @@
 import sys
 from os import path
 from glob import glob
+
+import argparse
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
 
@@ -90,8 +92,16 @@ def do_se(session, out):
         if (no_reads + has_qc + score) % 100 == 0:
             print(f"missing paired reads for {no_reads} runs. already have QC for {has_qc}. {score} PE reads with no QC")
 
+parser = argparse.ArgumentParser(description='')
+
+parser.add_argument('init')
+parser.add_argument('project')
+parser.add_argument('load')
+parser.add_argument('run')
+parser.add_argument('report')
 
 if __name__=="__main__":
+
     Session = sessionmaker()
     engine = create_engine(sys.argv[1])
     Session.configure(bind=engine)
