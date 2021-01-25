@@ -1,7 +1,8 @@
 # QCovid
-QC pipelines for sars-cov-2 sequence+consensus submitted to the ENA
 
-# What does this code do?
+QC pipeline for SARS-CoV-2 sequencing and assembly data submitted to the ENA.
+
+## What does this code do?
 
 Provides basic QC information on where in the reference genome there is/not coverage.
 Provides masks of a consensus assembly, showing which bases are supported by the majority of reads (the proportion is a parameter)
@@ -16,24 +17,60 @@ The processing therefore splits into two streams
 
 All data written to a SQL database, including the masks.
 
-# What precisely is the output
-See the outpur/spec.md file
+This repository includes tools for managing a database of these QC results.
 
-## Details
+### What precisely is the output
+
+See the output/spec.md file
+
+## Usage
+
+For complete details see `qcovid.py --help`
+
+### Initialise an QC database instance
+
+QCovid uses the SQLalchemy ORM. In general, `qcovid.py` is passed a database connection string as the first argument.
+
+To initialise a local sqlite instance:
+
+`qcovid.py sqlite:///my_db.sqlite init`
+
+This will create an instance of the QCovid database in file named `my_db.sqlite` in the current working directory.
+
+You may see a brief summary of the database contents with:
+
+`qcovid.py sqlite:///my_db.sqlite info`
+
+### Fetching raw sequencing data
+
+This pipeline is meant to be run on data which has been accessioned in the ENA. Fetch target runs by project use `enaDataBrowser`:
+
+`enaGroupGet.py PRJNAxxxxxx -w -f fastq -d projects/`
+
+This will populate a directory for the project and subdirectories for each run's fastq files.
+
+The `qcovid.py` tool can be used to import these samples into the database:
+
+`qcovid.py sqlite:///my_db.sqlite load PRJNAxxxxxx`
+
+This function will crawl through the downloaded project directory and populate the PairedRead and SingleRead tables.
+
+### Running pipelines
+
+`qcovid.py sqlite:///my_db.sqlite run` will invoke the pipeline for samples which have fastq files but no analysis output.
+
+## QC analysis 
 
 This QC pipeline considers raw sequencing data and is flexible over:
 
 * Single vs. paired reads (i.e. Nanopore vs. Illumina)
 * Amplicon primers
 
-
-
-
-## Single and Paired read pipelines
+### Single and Paired read pipelines
 
 We use `bwa` to map reads as part of the pipeline. Downstream analysis of the mapping is agnostic to mate pairing.
 
-## Preprocessing primer sets
+### Preprocessing primer sets
 
 Primers should be presented as a list of tab delimited names, start positions, and end positions.
 
@@ -52,50 +89,19 @@ SARS-CoV-2_15_pool1	4809	5359
 SARS-CoV-2_17_pool1	5563	6037
 ```
 
-There are about a dozen primer sets. Most samples post-April are ARTIC-v3.
+Import a primer set into the database using the `qcovid.py` utility:
+
+`qcovid.py import primers.bed`
+
+There are about a dozen primer sets. Most samples post-April 2020 are ARTIC-v3.
 
 Primer sets are not defined consistently and have to be preprocessed into these bed files individually. In general this entails parsing some list of sequences and putting them into a consistent coordinate system. We are using MN908947. If possible the amplicon names should follow the convention `SARS-CoV-2_{number}_{pool}` where `number` is the ID of the amplicon and `pool` specifies which (if any) reaction mix the primer is included in.
 
-For reference these scripts and raw primer sets are included in `primers/`. Brief notes follow.
+For reference these scripts and raw primer sets are included in `primers/`.
 
-### Dutch Primal 500-75
-`nCoV-nl-primal500-75.bed`. These were extracted from the supplementary materials for [...], provided in `primers/dutch_primal_amplicons.txt` and preprocessed with the script `primers/parse_nl_amplicons.py`. Note that some of these primers were supplied with IUPAC ambiguous nucleotides which may present an issue with locating them in the reference sequence.
+More information can be found in [primers/README.md](primers/README.md)
 
-### ARTIC-v3
-`nCoV-artic-v3.bed`. These primers come from a different reference that matches MW075808. Primer 13 LEFT, `TCGCACAAATGTCTACTTAGCTGT`, cannot be located verbatim in MN908947 but appears at position 3771 in the former reference and is homologous to `TCGCACGAAAGTCTACTTAGCTGT` in ours.
-
-`python parse_articv3_amplicons.py > nCoV-artic-v3.bed`
-
-## Fetching raw sequencing data
-
-`ena_data_get`
-
-## Target datasets
-
-### Nanopore
-
-* `PRJEB37966`
-* `PRJEB37886` ARTIC v3(?) https://www.cogconsortium.uk/protocols/
-* `PRJEB38388` Dutch primers https://www.biorxiv.org/content/10.1101/2020.04.21.050633v1.supplementary-material
-* `PRJNA613958` https://peerj.com/articles/9255/
-* `PRJNA614995` https://peerj.com/articles/9255/
-* `PRJNA616147` ARTIC v1 primers
-* `PRJNA622817` https://www.cdc.gov/coronavirus/2019-ncov/lab/rt-pcr-panel-primer-probes.html
-* `PRJNA627229` https://www.medrxiv.org/content/10.1101/2020.04.25.20079517v1.full.pdf
-* `PRJNA610248`
-* `PRJNA614976` https://doi.org/10.1016/j.cell.2020.04.021
-* `PRJNA632678` https://doi.org/10.1128/MRA.00573-20
-* `PRJNA601630` https://www.thelancet.com/journals/lancet/article/PIIS0140-6736(20)30154-9/fulltext
-* `PRJNA608224` https://www.biorxiv.org/content/10.1101/2020.03.05.976167v1.full
-* `PRJNA608242`
-* `PRJNA612578` https://www.biorxiv.org/content/biorxiv/early/2020/04/12/2020.04.09.034462.full.pdf
-* `PRJNA614504` https://europepmc.org/article/med/32676620
-* `PRJNA627286` https://onlinelibrary.wiley.com/doi/full/10.1002/jmv.26140
-
-### Illumina
-* TODO
-
-## Running the pipeline
+### Pipeline internals
 
 For single-end reads and the Dutch primers (PRJEB38388), one would run:
 
@@ -106,17 +112,14 @@ samtools index $WORK/$SAMPLE.MN908947.sorted.bam
 python3 bin_amplicons.py primers/nCoV-nl-primal500-75.bed $SAMPLE.MN908947.sorted.bam
 samtools sort $WORK/$SAMPLE.amplicons.bam -o $WORK/$SAMPLE.amplicons.sorted.bam
 samtools index $WORK/$SAMPLE.amplicons.sorted.bam
-````
+```
+## Data model
 
-TODO: include run-time estimates, nextflow batching by project
+![QCovid ORM schema](doc/schema.png)
 
 ## Interpreting results
 
-### Collating amplicon depths across a project
-
-TODO: jupyter notebook heatmap
-
-### Per-sample internal consistency
+See [QCovid_plots.ipynb](QCovid_plots.ipynb) for examples.
 
 ### Investigating cleaned reads
 `bin_amplicons.py` will optionally write reads that positively identify as amplicons to a 'cleaned' sam file.

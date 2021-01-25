@@ -253,7 +253,8 @@ if __name__ == "__main__":
 
     elif parser.command == 'import':
         """historical: load data from raw tsv file"""
-        import_metadata_batch(session, p=import_args.tsv)
+        raise NotImplementedError
+        #import_metadata_batch(session, p=import_args.tsv)
 
     elif parser.command == 'run':
         """For each sample with fastq data but no QC data, run pipeline"""
