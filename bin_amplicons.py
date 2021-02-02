@@ -4,6 +4,9 @@
 import sys
 import pysam
 
+# loosen the coordinate interval to cast non-softclipped adapter sequences
+PADDING = 5
+
 def load_amplicons(amplicon_bed):
     amplicons = {}
     for line in open(amplicon_bed):
@@ -23,7 +26,7 @@ def bin_amplicons(reference, amplicons, bam, filtered=None):
         for read in bam.fetch(reference, start, end):
             if not read.reference_start or not read.reference_end:
                 continue
-            if read.reference_start > (start - 5) and read.reference_end < (end + 5):
+            if read.reference_start > (start - PADDING) and read.reference_end < (end + PADDING):
                 rc += 1
                 if filtered:
                     filtered.write(read)
