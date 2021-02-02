@@ -1,11 +1,13 @@
 """Query or populate QCovid database
 """
 import sys
-from os import path
+from os import path, listdir
 from glob import glob
 
 import argparse
 import json
+
+import hashlib
 
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
@@ -14,6 +16,13 @@ from model import Dataset, Run, Assembly, PrimerSet, Amplicon, SelfQC, AmpliconQ
 import model
 
 VERSION = '0.0.2'
+
+def md5(fn):
+    hsh = hashlib.md5()
+    with open(fn, 'rb') as fd:
+        for c in iter(lambda: fd.read(4096), b""):
+            hsh.update(c)
+    return hsh.hexdigest()
 
 def crawl_ena_download(session, root, project, se=False, pe=False):
     """Crawl a dataset fetched from the ENA using enaBrowserTools:
@@ -35,23 +44,34 @@ def crawl_ena_download(session, root, project, se=False, pe=False):
         print(f"Dataset download directory does not exist: {prjroot}", file=sys.stderr)
         exit(1)
 
+    already_there = 0
     # crawl single-read experiments downloaded into PRJ
-    for sample in os.listdir(prjroot):
-        # test that sample has not already been accessioned
+    for sample in listdir(prjroot):
+        s = session.query(Run).filter(Run.ena_id==sample).count()
+        if s != 0:
+            already_there += 1
+            continue
         if '.txt' in sample:
-            fq = os.listdir(path.join(prjroot, sample))
-            if len(fq) == 1 or se:
-                # ensure _1.fq
-                print(f"single,{project},{fq}")
-                se += 1
+            continue
 
-            elif len(fq) == 2 or len(fq) == 3 or pe:
-                fq1, fq2 = list(sorted(fq))[-2:]
-                if '_1' not in fq1 or '_2' not in fq2:
-                    # unexpected naming convention
-                    continue
-                pe += 1
-                print(f"paired,{project},{fq1},{fq2}", file=sys.stderr)
+        # test that sample has not already been accessioned
+
+        fq = listdir(path.join(prjroot, sample))
+        if len(fq) == 1 or se:
+            fq = fq[0]
+            # ensure _1.fq
+            hsh = md5(f"{prjroot}/{sample}/{fq}")
+            print(f"single,{project},{sample},{fq},{hsh}", file=sys.stderr)
+            se += 1
+
+        elif len(fq) == 2 or len(fq) == 3 or pe:
+            fq1, fq2 = list(sorted(fq))[-2:]
+            if '_1' not in fq1 or '_2' not in fq2:
+                # unexpected naming convention
+                continue
+            pe += 1
+            print(f"paired,{project},{fq1},{fq2}", file=sys.stderr)
+    print(f"skipped {already_there} samples (already accessioned)")
 
 def dump_assembly(session, sample):
     """Retrieve fasta file for a given sample
@@ -222,9 +242,10 @@ prj_args = subargs.add_parser('project')
 
 load_args = subargs.add_parser('load')
 load_args.add_argument('dataset')
-load_args.add_argument('-d', default='./')
+load_args.add_argument('--dir', default='./')
 
 run_args = subargs.add_parser('run')
+run_args.add_argument('pipeline')
 
 report_args = subargs.add_parser('report')
 
@@ -241,9 +262,9 @@ if __name__ == "__main__":
 
     if args.command == 'load':
         """Crawl ena_data_get directory and import fastq file pairs into database"""
-        crawl_ena_download(session, load_args.d, load_args.dataset)
+        crawl_ena_download(session, args.dir, args.dataset)
 
-    elif parser.command == 'init':
+    elif args.command == 'init':
         """Initialise a QCovid database instance"""
         try:
             model.Base.metadata.create_all(engine)
@@ -251,18 +272,34 @@ if __name__ == "__main__":
             print(f"Attempting to create database failed for {args.db}", file=sys.stderr)
         session = Session()
 
-    elif parser.command == 'import':
+    elif args.command == 'import':
         """historical: load data from raw tsv file"""
         raise NotImplementedError
         #import_metadata_batch(session, p=import_args.tsv)
 
-    elif parser.command == 'run':
-        """For each sample with fastq data but no QC data, run pipeline"""
-        query = session.query(Run).filter(Run.ena_id==sample)
-        run_self_coverage(session, query)
+    elif args.command == 'run':
+        """For each sample with sequence data but no QC data, run pipeline"""
+        if not args.pipeline:
+            # run everything
+            print("asf")
+            pass
+        elif args.pipeline == 'self_qc':
+            pass
+        elif args.pipeline == 'bin_amplicons':
+            pass
 
-    elif parser.command == 'info':
+        for rtype in [SingleReads, PairedReads]:
+            query = session.query(rtype)
+            for rp in query:
+                print(f"{rp.uri}")
+
+
+        #run_self_coverage(session, query)
+
+    elif args.command == 'info':
         """Dump basic stats from database connection"""
-        pass
+        for name, table in [('runs', Run),('assemblies', Assembly),('SE reads', SingleReads),('PE reads', PairedReads)]:
+            count = session.query(table).count()
+            print(f"{name}:\t{count}")
 
     session.close()
