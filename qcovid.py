@@ -32,18 +32,19 @@ def crawl_fastas(session, path):
 
     for fa in listdir(path):
         if fa.endswith('.fa') or fa.endswith('.fasta'):
-            # test run for it exists
-            ena = fa.split('_')[0]
+            # test run for whether it exists
             name = fa.split('.')[0] # everything before the extension
+            ena = name.split('_')[0]
             run = session.query(Run).filter(Run.ena_id==ena).first()
             if not run:
                 missing.add(ena)
+                print(f"sample {ena} not accessioned", file=sys.stderr)
                 continue
 
             fd = open(f"{path}/{fa}")
             header = fd.readline()
-            if line[0] == '>':
-                desc = line.strip()[1:]
+            if header[0] == '>':
+                desc = header.strip()[1:]
             seq = ""
             bail = False
             for line in fd:
@@ -58,9 +59,9 @@ def crawl_fastas(session, path):
             run.assemblies.append(asm)
             session.add(asm)
             print(f"adding {fa}: {ena}, {desc}", file=sys.stderr)
+            session.commit()
             if bail:
                 continue
-    session.commit()
 
 def crawl_ena_download(session, root, project, se=False, pe=False):
     """Crawl a dataset fetched from the ENA using enaBrowserTools:
@@ -344,7 +345,7 @@ if __name__ == "__main__":
             print(f"Project {args.project_id} already exists", file=sys.stderr)
     elif args.command == 'fasta':
         # dump fasta of assemblies for sample
-        dump_assembly(args.sample)
+        dump_assembly(session, args.sample)
 
     elif args.command == 'import':
         """historical: load data from raw tsv file"""
