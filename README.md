@@ -59,6 +59,18 @@ The `qcovid.py` tool can be used to import these samples into the database:
 
 This function will crawl through the downloaded project directory and populate the PairedRead and SingleRead tables.
 
+### Import sample assemblies
+
+For the assembly QC, import fasta file:
+
+`qcovid.py sqlite:///my_db.sqlite load --assemblies Downloads/fastas PRJNAxxxxxx`
+
+QCovid will infer the sample name from the fasta file name.
+
+A fasta including all assemblies for a sample can be dumped:
+
+`qcovid.py sqlite:///my_db.sqlite fasta ERRxxxxxx`
+
 ### Running pipelines
 
 `qcovid.py sqlite:///my_db.sqlite run` will invoke the pipeline for samples which have fastq files but no analysis output.
