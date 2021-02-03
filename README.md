@@ -41,6 +41,10 @@ You may see a brief summary of the database contents with:
 
 `qcovid.py sqlite:///my_db.sqlite info`
 
+Initialise a project:
+
+`qcovid.py sqlite:///my_db.sqlite PRJNAxxxxxx --title "project description"`
+
 ### Fetching raw sequencing data
 
 This pipeline is meant to be run on data which has been accessioned in the ENA. Fetch target runs by project use `enaDataBrowser`:
@@ -51,7 +55,7 @@ This will populate a directory for the project and subdirectories for each run's
 
 The `qcovid.py` tool can be used to import these samples into the database:
 
-`qcovid.py sqlite:///my_db.sqlite load PRJNAxxxxxx`
+`qcovid.py sqlite:///my_db.sqlite load PRJNAxxxxxx --dir Downloads/`
 
 This function will crawl through the downloaded project directory and populate the PairedRead and SingleRead tables.
 

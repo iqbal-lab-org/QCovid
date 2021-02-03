@@ -35,7 +35,7 @@ def crawl_ena_download(session, root, project, se=False, pe=False):
     file is single-ended run. 2 or 3 fastq files, where 2 end with _1 and _2
     are interpreted as paired-end.
     """
-    prj = session.query(Dataset).filter(Dataset.ena_id==project)
+    prj = session.query(Dataset).filter(Dataset.ena_id==project).first()
     prjroot = path.join(root, project)
     if not prj:
         print(f"Dataset {project} does not exist in database", file=sys.stderr)
@@ -47,30 +47,42 @@ def crawl_ena_download(session, root, project, se=False, pe=False):
     already_there = 0
     # crawl single-read experiments downloaded into PRJ
     for sample in listdir(prjroot):
-        s = session.query(Run).filter(Run.ena_id==sample).count()
-        if s != 0:
-            already_there += 1
-            continue
         if '.txt' in sample:
             continue
 
         # test that sample has not already been accessioned
-
+        s = session.query(Run).filter(Run.ena_id==sample).count()
+        if s != 0:
+            already_there += 1
+            continue
         fq = listdir(path.join(prjroot, sample))
+        
+        run = Run(ena_id=sample, dataset_id=prj.id)
+        prj.runs.append(run)
+        session.add(run)
+
         if len(fq) == 1 or se:
             fq = fq[0]
             # ensure _1.fq
             hsh = md5(f"{prjroot}/{sample}/{fq}")
             print(f"single,{project},{sample},{fq},{hsh}", file=sys.stderr)
             se += 1
+            reads = SingleReads(run_id=run.id, uri=fq, md5=hsh)
+            
+            #run.se_reads.append(reads)
+            session.add(reads)
 
         elif len(fq) == 2 or len(fq) == 3 or pe:
             fq1, fq2 = list(sorted(fq))[-2:]
             if '_1' not in fq1 or '_2' not in fq2:
                 # unexpected naming convention
                 continue
-            pe += 1
             print(f"paired,{project},{fq1},{fq2}", file=sys.stderr)
+            pe += 1
+        else:
+            continue
+
+    session.commit()
     print(f"skipped {already_there} samples (already accessioned)")
 
 def dump_assembly(session, sample):
@@ -157,10 +169,9 @@ def import_metadata_batch(session, p):
         if project == 'sample_id':
             continue
         
-        prjs = list(session.query(Dataset).filter(Dataset.ena_id==project))
-        if len(prjs) == 0:
+        prjs = session.query(Dataset).filter(Dataset.ena_id==project).first()
+        if not prjs:
             dataset = Dataset(ena_id=project, project_title=project_title)
-            prj = dataset
             session.add(dataset)
             session.commit()
         prjs = list(session.query(Dataset).filter(Dataset.ena_id==project))
@@ -239,6 +250,8 @@ subargs = parser.add_subparsers(dest='command')
 init_args = subargs.add_parser('init')
 
 prj_args = subargs.add_parser('project')
+prj_args.add_argument('project_id')
+prj_args.add_argument('--title')
 
 load_args = subargs.add_parser('load')
 load_args.add_argument('dataset')
@@ -272,6 +285,20 @@ if __name__ == "__main__":
             print(f"Attempting to create database failed for {args.db}", file=sys.stderr)
         session = Session()
 
+    elif args.command == 'project':
+        # add new project
+        prj = session.query(Dataset).filter_by(ena_id=args.project_id).first()
+        if not prj:
+            title = args.project_id
+            if args.title:
+                title = args.title
+            dset = Dataset(ena_id=args.project_id, project_title=title)
+            session.add(dset)
+            session.commit()
+        else:
+            print(f"Project {args.project_id} already exists", file=sys.stderr)
+
+
     elif args.command == 'import':
         """historical: load data from raw tsv file"""
         raise NotImplementedError
@@ -298,7 +325,7 @@ if __name__ == "__main__":
 
     elif args.command == 'info':
         """Dump basic stats from database connection"""
-        for name, table in [('runs', Run),('assemblies', Assembly),('SE reads', SingleReads),('PE reads', PairedReads)]:
+        for name, table in [('datasets', Dataset), ('runs', Run),('assemblies', Assembly),('SE reads', SingleReads),('PE reads', PairedReads)]:
             count = session.query(table).count()
             print(f"{name}:\t{count}")
 
