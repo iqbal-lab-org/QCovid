@@ -24,6 +24,44 @@ def md5(fn):
             hsh.update(c)
     return hsh.hexdigest()
 
+def crawl_fastas(session, path):
+    """Crawl path for fasta files and load them into database if sample
+    name exists
+    """
+    missing = set() # count assemblies for runs that don't exist
+
+    for fa in listdir(path):
+        if fa.endswith('.fa') or fa.endswith('.fasta'):
+            # test run for it exists
+            ena = fa.split('_')[0]
+            name = fa.split('.')[0] # everything before the extension
+            run = session.query(Run).filter(Run.ena_id==ena).first()
+            if not run:
+                missing.add(ena)
+                continue
+
+            fd = open(f"{path}/{fa}")
+            header = fd.readline()
+            if line[0] == '>':
+                desc = line.strip()[1:]
+            seq = ""
+            bail = False
+            for line in fd:
+                if '>' in line:
+                    print(f"invalid fasta file {fa} (multiple entries)", file=sys.stderr)
+                    fd.close()
+                    bail = True
+                    break
+                seq += line.strip()
+
+            asm = Assembly(run_id=run.id, name=name, description=desc, sequence=seq)
+            run.assemblies.append(asm)
+            session.add(asm)
+            print(f"adding {fa}: {ena}, {desc}", file=sys.stderr)
+            if bail:
+                continue
+    session.commit()
+
 def crawl_ena_download(session, root, project, se=False, pe=False):
     """Crawl a dataset fetched from the ENA using enaBrowserTools:
     `enaGroupGet.py PRJNAxxxxxx -w -f fastq`
@@ -89,6 +127,7 @@ def dump_assembly(session, sample):
     """Retrieve fasta file for a given sample
     """
     run = session.query(Run).filter(Run.ena_id==sample).first()
+
     for assembly in session.query(Assembly).filter(Assembly.run_id==run.id):
         print(f">{assembly.description}\n{assembly.sequence}")
 
@@ -256,13 +295,15 @@ prj_args.add_argument('--title')
 load_args = subargs.add_parser('load')
 load_args.add_argument('dataset')
 load_args.add_argument('--dir', default='./')
+load_args.add_argument('--assemblies')
 
 run_args = subargs.add_parser('run')
 run_args.add_argument('pipeline')
 
 report_args = subargs.add_parser('report')
 
-dump_args = subargs.add_parser('dump')
+dump_args = subargs.add_parser('fasta')
+dump_args.add_argument('sample')
 
 info_args = subargs.add_parser('info')
 
@@ -275,7 +316,11 @@ if __name__ == "__main__":
 
     if args.command == 'load':
         """Crawl ena_data_get directory and import fastq file pairs into database"""
-        crawl_ena_download(session, args.dir, args.dataset)
+        if args.assemblies:
+            # rather, import fastas
+            crawl_fastas(session, args.assemblies)
+        else:
+            crawl_ena_download(session, args.dir, args.dataset)
 
     elif args.command == 'init':
         """Initialise a QCovid database instance"""
@@ -297,7 +342,9 @@ if __name__ == "__main__":
             session.commit()
         else:
             print(f"Project {args.project_id} already exists", file=sys.stderr)
-
+    elif args.command == 'fasta':
+        # dump fasta of assemblies for sample
+        dump_assembly(args.sample)
 
     elif args.command == 'import':
         """historical: load data from raw tsv file"""
