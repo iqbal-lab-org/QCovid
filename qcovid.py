@@ -100,12 +100,16 @@ def crawl_ena_download(session, root, project, se=False, pe=False):
         prj.runs.append(run)
         session.add(run)
 
+        run = session.query(Run).filter(Run.ena_id==sample).first()
+        assert run
+
         if len(fq) == 1 or se:
             fq = fq[0]
             # ensure _1.fq
             hsh = md5(f"{prjroot}/{sample}/{fq}")
             print(f"single,{project},{sample},{fq},{hsh}", file=sys.stderr)
             se += 1
+
             reads = SingleReads(run_id=run.id, uri=fq, md5=hsh)
             
             #run.se_reads.append(reads)
@@ -300,6 +304,7 @@ load_args.add_argument('--assemblies')
 
 run_args = subargs.add_parser('run')
 run_args.add_argument('pipeline')
+run_args.add_argument('--prefix', default='')
 
 report_args = subargs.add_parser('report')
 
@@ -343,6 +348,7 @@ if __name__ == "__main__":
             session.commit()
         else:
             print(f"Project {args.project_id} already exists", file=sys.stderr)
+
     elif args.command == 'fasta':
         # dump fasta of assemblies for sample
         dump_assembly(session, args.sample)
@@ -354,22 +360,29 @@ if __name__ == "__main__":
 
     elif args.command == 'run':
         """For each sample with sequence data but no QC data, run pipeline"""
-        if not args.pipeline:
-            # run everything
-            print("asf")
-            pass
-        elif args.pipeline == 'self_qc':
-            pass
+        path = args.prefix
+        if args.pipeline == 'self_qc':
+            # self qc
+            print(f"sample,mode,fq1,fq2")
+            for rtype in [SingleReads, PairedReads]:
+                query = session.query(rtype)
+                for rp in query:
+                    run = session.query(Run).filter(Run.id==rp.run_id).first()
+                    project = session.query(Dataset).filter(Dataset.id==run.dataset_id).first()
+
+                    if not run: # ????
+                        continue
+                    for assembly in run.assemblies:
+                        qc = session.query(SelfQC).filter(SelfQC.assembly_id==assembly.id).first()
+                        if qc:
+                            continue
+                        print(f"{run.ena_id},single,{args.prefix}{project.ena_id}/{rp.uri}")
+
         elif args.pipeline == 'bin_amplicons':
-            pass
-
-        for rtype in [SingleReads, PairedReads]:
-            query = session.query(rtype)
-            for rp in query:
-                print(f"{rp.uri}")
-
-
-        #run_self_coverage(session, query)
+             for rtype in [SingleReads, PairedReads]:
+                query = session.query(rtype)
+                for rp in query:
+                    pass
 
     elif args.command == 'info':
         """Dump basic stats from database connection"""
