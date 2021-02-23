@@ -43,7 +43,7 @@ You may see a brief summary of the database contents with:
 
 Initialise a project:
 
-`qcovid.py sqlite:///my_db.sqlite PRJNAxxxxxx --title "project description"`
+`qcovid.py sqlite:///my_db.sqlite project PRJNAxxxxxx --title "project description"`
 
 ### Fetching raw sequencing data
 
