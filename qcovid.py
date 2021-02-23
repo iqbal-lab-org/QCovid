@@ -85,6 +85,8 @@ def crawl_ena_download(session, root, project, se=False, pe=False):
 
     already_there = 0
     # crawl single-read experiments downloaded into PRJ
+    se = 0
+    pe = 0
     for sample in listdir(prjroot):
         if '.txt' in sample:
             continue
@@ -99,34 +101,38 @@ def crawl_ena_download(session, root, project, se=False, pe=False):
         run = Run(ena_id=sample, dataset_id=prj.id)
         prj.runs.append(run)
         session.add(run)
+        session.flush()
 
-        run = session.query(Run).filter(Run.ena_id==sample).first()
-        assert run
+        assert run.id
 
         if len(fq) == 1 or se:
             fq = fq[0]
             # ensure _1.fq
             hsh = md5(f"{prjroot}/{sample}/{fq}")
-            print(f"single,{project},{sample},{fq},{hsh}", file=sys.stderr)
             se += 1
-
             reads = SingleReads(run_id=run.id, uri=fq, md5=hsh)
-            
             #run.se_reads.append(reads)
             session.add(reads)
+            print(f"single,{project},{sample},{fq},{hsh}", file=sys.stderr)
 
         elif len(fq) == 2 or len(fq) == 3 or pe:
             fq1, fq2 = list(sorted(fq))[-2:]
             if '_1' not in fq1 or '_2' not in fq2:
                 # unexpected naming convention
                 continue
-            print(f"paired,{project},{fq1},{fq2}", file=sys.stderr)
+
+            hsh1 = md5(f"{prjroot}/{sample}/{fq1}")
+            hsh2 = md5(f"{prjroot}/{sample}/{fq2}")
+
+            print(f"paired,{project},{fq1},{hsh1},{fq2},{hsh2}", file=sys.stderr)
             pe += 1
+            reads = PairedReads(run_id=run.id, r1_uri=fq1, r1_md5=hsh1, r2_uri=fq2, r2_md5=hsh2)
+            session.add(reads)
         else:
             continue
 
     session.commit()
-    print(f"skipped {already_there} samples (already accessioned)")
+    print(f"added {se} singled end, {pe} paired end reads. skipped {already_there} samples (already accessioned)")
 
 def dump_assembly(session, sample):
     """Retrieve fasta file for a given sample
@@ -363,20 +369,21 @@ if __name__ == "__main__":
         path = args.prefix
         if args.pipeline == 'self_qc':
             # self qc
-            print(f"sample,mode,fq1,fq2")
-            for rtype in [SingleReads, PairedReads]:
-                query = session.query(rtype)
-                for rp in query:
-                    run = session.query(Run).filter(Run.id==rp.run_id).first()
-                    project = session.query(Dataset).filter(Dataset.id==run.dataset_id).first()
+            #print(f"sample,mode,fq")
+            query = session.query(PairedReads)
+            for rp in query:
+                run = session.query(Run).filter(Run.id==rp.run_id).first()
+                project = session.query(Dataset).filter(Dataset.id==run.dataset_id).first()
 
-                    if not run: # ????
+                if not run: # ????
+                    continue
+                for assembly in run.assemblies:
+                    qc = session.query(SelfQC).filter(SelfQC.assembly_id==assembly.id).first()
+                    if qc:
                         continue
-                    for assembly in run.assemblies:
-                        qc = session.query(SelfQC).filter(SelfQC.assembly_id==assembly.id).first()
-                        if qc:
-                            continue
-                        print(f"{run.ena_id},single,{args.prefix}{project.ena_id}/{rp.uri}")
+                    print(f"# {run.ena_id},paired,{args.prefix}{project.ena_id}/{rp.r1_uri},{args.prefix}{project.ena_id}/{rp.r2_uri}")
+                    print(f"self_qc.sh {args.db} {run.ena_id} {args.prefix}{project.ena_id}/{run.ena_id}/{rp.r1_uri} {args.prefix}{project.ena_id}/{run.ena_id}/{rp.r2_uri}")
+
 
         elif args.pipeline == 'bin_amplicons':
              for rtype in [SingleReads, PairedReads]:

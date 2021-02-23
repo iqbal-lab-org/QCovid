@@ -6,7 +6,7 @@ import pysam
 
 ref = pysam.FastaFile(sys.argv[2])
 bam = pysam.AlignmentFile(sys.argv[1], 'rb')
-
+print('\t'.join(["reference", "position", "ref", "ref_depth", "total_depth", "n_segments", "n_aligned", "freq", "n_segments/n_aligned", "insertions", "deletions", "bases"]))
 for pc in bam.pileup(stepper='samtools', fastafile=ref):
     dels = 0
     ins = 0

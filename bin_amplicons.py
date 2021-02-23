@@ -18,6 +18,7 @@ def load_amplicons(amplicon_bed):
 
 def bin_amplicons(reference, amplicons, bam, filtered=None):
     histogram = {}
+    total = 0
     for amplicon in amplicons:
         start, end = amplicons[amplicon]
 
@@ -26,7 +27,9 @@ def bin_amplicons(reference, amplicons, bam, filtered=None):
         for read in bam.fetch(reference, start, end):
             if not read.reference_start or not read.reference_end:
                 continue
-            if read.reference_start > (start - PADDING) and read.reference_end < (end + PADDING):
+            if read.mate_is_unmapped:
+                continue
+            if read.reference_start > (start - PADDING) and read.reference_end < (end + PADDING) and read.next_reference_start > start:
                 rc += 1
                 if filtered:
                     filtered.write(read)
@@ -54,7 +57,7 @@ def main():
     filtered = pysam.AlignmentFile(out_name, 'wb', template=bam)
     amplicons = load_amplicons(amplicon_bed)
     histogram = bin_amplicons(reference, amplicons, bam, filtered=filtered)
-    total = sum(histogram.values)
+    total = sum(histogram.values())
 
     amps_fd = open(out_amps, 'w')
     summary = '\t'.join([basename, str(total), amplicon_bed, reference])
