@@ -6,7 +6,20 @@ import pysam
 
 ref = pysam.FastaFile(sys.argv[2])
 bam = pysam.AlignmentFile(sys.argv[1], 'rb')
-print('\t'.join(["reference", "position", "ref", "ref_depth", "total_depth", "n_segments", "n_aligned", "freq", "n_segments/n_aligned", "insertions", "deletions", "bases"]))
+fastout = '--fasta' in sys.argv
+
+if not fastout:
+    print('\t'.join(["reference", "position", "ref", "ref_depth", "total_depth", "n_segments", "n_aligned", "freq", "n_segments/n_aligned", "insertions", "deletions", "bases"]))
+
+refseq = ""
+orig_name = ""
+for line in open(sys.argv[2]):
+    if line[0] == '>':
+        orig_name = line[1:]
+        continue
+    refseq += line.strip()
+masked = list(refseq)
+
 for pc in bam.pileup(stepper='samtools', fastafile=ref):
     dels = 0
     ins = 0
@@ -50,4 +63,11 @@ for pc in bam.pileup(stepper='samtools', fastafile=ref):
     for k in d:
         bases.append(f"{k}:{d[k]}")
     bases = ';'.join(bases)
-    print('\t'.join(map(str, [pc.reference_name, pc.reference_pos + 1, ref_base, ref_count, d_total, pc.nsegments, num_aligned, freq, num_aligned / pc.nsegments, ins, dels, bases])))
+    if not fastout:
+        print('\t'.join(map(str, [pc.reference_name, pc.reference_pos + 1, ref_base, ref_count, d_total, pc.nsegments, num_aligned, freq, num_aligned / pc.nsegments, ins, dels, bases])))
+    else:
+        masked[pc.reference_pos] = 'N'
+
+if fastout:
+    print(f">{orig_name}_masked")
+    print(''.join(masked))

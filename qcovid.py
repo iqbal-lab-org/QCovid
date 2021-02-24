@@ -24,7 +24,7 @@ def md5(fn):
             hsh.update(c)
     return hsh.hexdigest()
 
-def crawl_fastas(session, path):
+def crawl_fastas(session, path, dataset=None):
     """Crawl path for fasta files and load them into database if sample
     name exists
     """
@@ -34,7 +34,9 @@ def crawl_fastas(session, path):
         if fa.endswith('.fa') or fa.endswith('.fasta'):
             # test run for whether it exists
             name = fa.split('.')[0] # everything before the extension
-            ena = name.split('_')[0]
+            if dataset:
+                name = f"{name}:{dataset}"
+            ena = name #.split('_')[0]
             run = session.query(Run).filter(Run.ena_id==ena).first()
             if not run:
                 missing.add(ena)
@@ -307,6 +309,7 @@ load_args = subargs.add_parser('load')
 load_args.add_argument('dataset')
 load_args.add_argument('--dir', default='./')
 load_args.add_argument('--assemblies')
+load_args.add_argument('--assembly', default=None)
 
 run_args = subargs.add_parser('run')
 run_args.add_argument('pipeline')
@@ -330,7 +333,7 @@ if __name__ == "__main__":
         """Crawl ena_data_get directory and import fastq file pairs into database"""
         if args.assemblies:
             # rather, import fastas
-            crawl_fastas(session, args.assemblies)
+            crawl_fastas(session, args.assemblies, args.assembly_group)
         else:
             crawl_ena_download(session, args.dir, args.dataset)
 
