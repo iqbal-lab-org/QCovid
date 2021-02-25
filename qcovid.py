@@ -212,21 +212,75 @@ def import_amplicons(session, bed, name=None):
     print(f"loaded primerset {name}, {count} amplicons")
     session.commit()
 
-def import_selfqc(session, fn):
+def import_selfqc(session, fn, name=None):
     fd = open(fn)
+    a_id = fn.split('/')[-1].split('.')[0]
+    if name:
+        a_id = name
+ 
+    assembly_id = session.query(Dataset).filter(Assembly.name==a_id).first()
+    if not assembly_id:
+        print(f"assembly for mask {fn}, {a_id} doesn't exist")
+        exit(1)
+
+    s_qc = session.query(SelfQC).filter(SelfQC.assembly_id==assembly_id.id).filter(SelfQC.version==VERSION).first()
+    if s_qc:
+        print(f"self_qc row already exists for {fn}, {a_id}")
+        exit(1)
+
     header = fd.readline().split('\t')
     if len(header) != 12:
         print(f"bad self_qc file header for {fn}")
         exit(1)
-    reference, position, ref, ref_depth, total_depth, n_segments, n_aligned, freq, freq_aligned, ins, dels, bases = header
+    #reference, position, ref, ref_depth, total_depth, n_segments, n_aligned, freq, freq_aligned, ins, dels, bases = header
+    reference, *rest = header
     if reference != 'reference':
         print(f"bad self_qc header row for {fn}: {header}")
         exit(1)
     rows = []
+
+    f_95 = 0
+    f_90 = 0
+    f_85 = 0
+    f_80 = 0
+    f_75 = 0
+    f_00 = 0
+
+    ma_30 = 0
+    ns = 0
+    dashes = 0
+    bases = 0
+
     for line in fd:
-        rows.append(dict(zip(header, line.split('\t'))))
-    print(rows)
-        
+        row = dict(zip(header, line.split('\t')))
+        f = float(row['n_segments/n_aligned'])
+        if f <= 0.95:
+            f_95 += 1
+        if f <= 0.90:
+            f_90 += 1
+        if f <= 0.85:
+            f_85 += 1
+        if f <= 0.80:
+            f_80 += 1
+        if f <= 0.75:
+            f_75 += 1
+        if f <= 0:
+            f_00 += 1
+
+        if row['ref'] == 'N':
+            ns += 1
+        elif row['ref'] == '-':
+            dashes += 1
+
+        if int(row['n_segments']) <= 30:
+            ma_30 += 1
+
+        bases += 1
+    sqc_row = SelfQC(assembly_id=assembly_id.id, version=VERSION, f_95=f_95, f_90=f_90, f_85=f_85,\
+            f_75=f_75, f_00=f_00, ma_30=ma_30, ns=ns, dashes=dashes, bases=bases)
+    print(f"added self qc data for {a_id}, ")
+    session.add(sqc_row)
+    session.commit()
 
 def import_metadata_batch(session, p):
     """Historical: load project metadata from a TSV file
@@ -341,6 +395,7 @@ info_args = subargs.add_parser('info')
 import_args = subargs.add_parser('import')
 import_args.add_argument('--self_qc')
 import_args.add_argument('--amplicon_qc')
+import_args.add_argument('--name')
 
 if __name__ == "__main__":
     args = parser.parse_args()
@@ -382,9 +437,13 @@ if __name__ == "__main__":
         # dump fasta of assemblies for sample
         dump_assembly(session, args.sample)
 
+    elif args.command == 'mask':
+        # dump fasta of assemblies for sample
+        dump_mask(session, args.assembly)
+
     elif args.command == 'import':
         if args.self_qc:
-            import_selfqc(session, args.self_qc)
+            import_selfqc(session, args.self_qc, name=args.name)
         #import_metadata_batch(session, p=import_args.tsv)
 
     elif args.command == 'run':
