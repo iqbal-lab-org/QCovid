@@ -34,9 +34,10 @@ def crawl_fastas(session, path, dataset=None):
         if fa.endswith('.fa') or fa.endswith('.fasta'):
             # test run for whether it exists
             name = fa.split('.')[0] # everything before the extension
+            ena = name #.split('_')[0]
             if dataset:
                 name = f"{name}:{dataset}"
-            ena = name #.split('_')[0]
+ 
             run = session.query(Run).filter(Run.ena_id==ena).first()
             if not run:
                 missing.add(ena)
@@ -142,7 +143,7 @@ def dump_assembly(session, sample):
     run = session.query(Run).filter(Run.ena_id==sample).first()
 
     for assembly in session.query(Assembly).filter(Assembly.run_id==run.id):
-        print(f">{assembly.description}\n{assembly.sequence}")
+        print(f">{assembly.name} {assembly.description}\n{assembly.sequence}")
 
 def run_self_coverage(session, query, root='./'):
     """Pass paths to read files for a set of runs to self_coverage pipeline
@@ -211,6 +212,21 @@ def import_amplicons(session, bed, name=None):
     print(f"loaded primerset {name}, {count} amplicons")
     session.commit()
 
+def import_selfqc(session, fn):
+    fd = open(fn)
+    header = fd.readline().split('\t')
+    if len(header) != 12:
+        print(f"bad self_qc file header for {fn}")
+        exit(1)
+    reference, position, ref, ref_depth, total_depth, n_segments, n_aligned, freq, freq_aligned, ins, dels, bases = header
+    if reference != 'reference':
+        print(f"bad self_qc header row for {fn}: {header}")
+        exit(1)
+    rows = []
+    for line in fd:
+        rows.append(dict(zip(header, line.split('\t'))))
+    print(rows)
+        
 
 def import_metadata_batch(session, p):
     """Historical: load project metadata from a TSV file
@@ -309,7 +325,7 @@ load_args = subargs.add_parser('load')
 load_args.add_argument('dataset')
 load_args.add_argument('--dir', default='./')
 load_args.add_argument('--assemblies')
-load_args.add_argument('--assembly', default=None)
+load_args.add_argument('--batch', default=None)
 
 run_args = subargs.add_parser('run')
 run_args.add_argument('pipeline')
@@ -322,6 +338,10 @@ dump_args.add_argument('sample')
 
 info_args = subargs.add_parser('info')
 
+import_args = subargs.add_parser('import')
+import_args.add_argument('--self_qc')
+import_args.add_argument('--amplicon_qc')
+
 if __name__ == "__main__":
     args = parser.parse_args()
     Session = sessionmaker()
@@ -333,7 +353,7 @@ if __name__ == "__main__":
         """Crawl ena_data_get directory and import fastq file pairs into database"""
         if args.assemblies:
             # rather, import fastas
-            crawl_fastas(session, args.assemblies, args.assembly_group)
+            crawl_fastas(session, args.assemblies, args.batch)
         else:
             crawl_ena_download(session, args.dir, args.dataset)
 
@@ -363,8 +383,8 @@ if __name__ == "__main__":
         dump_assembly(session, args.sample)
 
     elif args.command == 'import':
-        """historical: load data from raw tsv file"""
-        raise NotImplementedError
+        if args.self_qc:
+            import_selfqc(session, args.self_qc)
         #import_metadata_batch(session, p=import_args.tsv)
 
     elif args.command == 'run':
@@ -386,7 +406,6 @@ if __name__ == "__main__":
                         continue
                     print(f"# {run.ena_id},paired,{args.prefix}{project.ena_id}/{rp.r1_uri},{args.prefix}{project.ena_id}/{rp.r2_uri}")
                     print(f"self_qc.sh {args.db} {run.ena_id} {args.prefix}{project.ena_id}/{run.ena_id}/{rp.r1_uri} {args.prefix}{project.ena_id}/{run.ena_id}/{rp.r2_uri}")
-
 
         elif args.pipeline == 'bin_amplicons':
              for rtype in [SingleReads, PairedReads]:
