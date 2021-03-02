@@ -1,6 +1,6 @@
 """Declarative datamodel for covid assembly QC reporting pipeline
 """
-from sqlalchemy import Column, ForeignKey, Integer, String
+from sqlalchemy import Column, ForeignKey, Integer, String, Float
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import relationship
 
@@ -41,7 +41,7 @@ class SingleReads(Base):
     run_id = Column(Integer, ForeignKey('run.id'))
     run = relationship("Run", back_populates="se_reads")
     read_length_mean = Column(Float)
-    read_length_std = Column(Fload)
+    read_length_std = Column(Float)
 
     uri = Column(String(200))
     md5 = Column(String(32))
@@ -58,7 +58,7 @@ class PairedReads(Base):
     read_count = Column(Integer)
     merged = Column(Integer)
     read_length_mean = Column(Float)
-    read_length_std = Column(Fload)
+    read_length_std = Column(Float)
 
     r1_uri = Column(String(200))
     r1_md5 = Column(String(32))
