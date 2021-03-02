@@ -218,12 +218,13 @@ def import_selfqc(session, fn, name=None):
     if name:
         a_id = name
  
-    assembly_id = session.query(Dataset).filter(Assembly.name==a_id).first()
+    assembly_id = session.query(Assembly).filter(Assembly.name==a_id).first()
     if not assembly_id:
         print(f"assembly for mask {fn}, {a_id} doesn't exist")
         exit(1)
 
     s_qc = session.query(SelfQC).filter(SelfQC.assembly_id==assembly_id.id).filter(SelfQC.version==VERSION).first()
+    print(f"{assembly_id.id}, {a_id}")
     if s_qc:
         print(f"self_qc row already exists for {fn}, {a_id}")
         exit(1)
@@ -464,7 +465,7 @@ if __name__ == "__main__":
                     if qc:
                         continue
                     print(f"# {run.ena_id},paired,{args.prefix}{project.ena_id}/{rp.r1_uri},{args.prefix}{project.ena_id}/{rp.r2_uri}")
-                    print(f"self_qc.sh {args.db} {run.ena_id} {args.prefix}{project.ena_id}/{run.ena_id}/{rp.r1_uri} {args.prefix}{project.ena_id}/{run.ena_id}/{rp.r2_uri}")
+                    print(f"bsub -e qc{run.ena_id}.e -o qc{run.ena_id}.o -M4000 -J qc-{run.ena_id} sh self_qc.sh {args.db} {run.ena_id} {args.prefix}{project.ena_id}/{run.ena_id}/{rp.r1_uri} {args.prefix}{project.ena_id}/{run.ena_id}/{rp.r2_uri}")
 
         elif args.pipeline == 'bin_amplicons':
              for rtype in [SingleReads, PairedReads]:

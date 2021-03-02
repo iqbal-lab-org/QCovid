@@ -30,6 +30,8 @@ for pc in bam.pileup(stepper='samtools', fastafile=ref):
     d_total = 0
 
     ref_base = ref.fetch(pc.reference_name, pc.reference_pos, pc.reference_pos+1)
+    if ref_base not in d:
+        ref_base = 'N'
     for read in pc.pileups:
         if read.indel < 0:
             dels += 1
@@ -44,6 +46,8 @@ for pc in bam.pileup(stepper='samtools', fastafile=ref):
             pass
         else:
             base = read.alignment.query_sequence[read.query_position]
+            if base not in d:
+                base = 'N'
             d[base] += 1
             d_total += 1
 
