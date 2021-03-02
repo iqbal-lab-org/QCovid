@@ -40,6 +40,8 @@ class SingleReads(Base):
     id = Column(Integer, primary_key=True)
     run_id = Column(Integer, ForeignKey('run.id'))
     run = relationship("Run", back_populates="se_reads")
+    read_length_mean = Column(Float)
+    read_length_std = Column(Fload)
 
     uri = Column(String(200))
     md5 = Column(String(32))
@@ -52,6 +54,11 @@ class PairedReads(Base):
     id = Column(Integer, primary_key=True)
     run_id = Column(Integer, ForeignKey('run.id'))
     run = relationship("Run", back_populates="pe_reads")
+
+    read_count = Column(Integer)
+    merged = Column(Integer)
+    read_length_mean = Column(Float)
+    read_length_std = Column(Fload)
 
     r1_uri = Column(String(200))
     r1_md5 = Column(String(32))
@@ -91,7 +98,12 @@ class SelfQC(Base):
     ma_30 = Column(Integer)
     ns = Column(Integer)
     dashes = Column(Integer)
+    unmapped = Column(Integer)
     bases = Column(Integer)
+    template_size_mean = Column(Float)
+    template_size_std = Column(Float)
+    r1forward = Column(Integer)
+    r2reverse = Column(Integer)
 
 
 class Mask(Base):
@@ -119,6 +131,9 @@ class AmpliconQC(Base):
     runs = relationship("Run", back_populates="amplicon_qcs")
 
     reads = Column(Integer)
+    forward_reads = Column(Integer)
+    backward_reads = Column(Integer)
+    unmapped_mates = Column(Integer)
     version = Column(String(16))
 
 
