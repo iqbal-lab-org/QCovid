@@ -104,6 +104,7 @@ class SelfQC(Base):
     template_size_std = Column(Float)
     r1forward = Column(Integer)
     r2reverse = Column(Integer)
+    secondary_alignments = Column(Integer)
 
 
 class Mask(Base):
@@ -134,8 +135,14 @@ class AmpliconQC(Base):
     forward_reads = Column(Integer)
     backward_reads = Column(Integer)
     unmapped_mates = Column(Integer)
+    offtarget_mates = Column(Integer)
+    reads_with_primer = Column(Integer)
+    pairs_with_primers = Column(Integer)
+    inner_fragments = Column(Integer)
+    secondary_alignments = Column(Integer)
+    read_crossing_interval = Column(Integer)
+    fragment_crossing_interval = Column(Integer)
     version = Column(String(16))
-
 
 class PrimerSet(Base):
     """Groups of amplicons
