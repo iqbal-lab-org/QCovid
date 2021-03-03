@@ -99,6 +99,9 @@ def crawl_ena_download(session, root, project, se=False, pe=False):
         if s != 0:
             already_there += 1
             continue
+
+        if not path.isdir(path.join(prjroot, sample)):
+            continue
         fq = listdir(path.join(prjroot, sample))
         
         run = Run(ena_id=sample, dataset_id=prj.id)
@@ -108,7 +111,8 @@ def crawl_ena_download(session, root, project, se=False, pe=False):
 
         assert run.id
 
-        if len(fq) == 1 or se:
+        if len(fq) == 1:
+            continue
             fq = fq[0]
             # ensure _1.fq
             hsh = md5(f"{prjroot}/{sample}/{fq}")
@@ -118,7 +122,7 @@ def crawl_ena_download(session, root, project, se=False, pe=False):
             session.add(reads)
             print(f"single,{project},{sample},{fq},{hsh}", file=sys.stderr)
 
-        elif len(fq) == 2 or len(fq) == 3 or pe:
+        elif len(fq) == 2 or len(fq) == 3:
             fq1, fq2 = list(sorted(fq))[-2:]
             if '_1' not in fq1 or '_2' not in fq2:
                 # unexpected naming convention
