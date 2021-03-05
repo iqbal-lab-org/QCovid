@@ -9,7 +9,7 @@ bam = pysam.AlignmentFile(sys.argv[1], 'rb')
 fastout = '--fasta' in sys.argv
 
 if not fastout:
-    print('\t'.join(["reference", "position", "ref", "ref_depth", "total_depth", "n_segments", "n_aligned", "freq", "n_segments/n_aligned", "insertions", "deletions", "bases"]))
+    print('\t'.join(["reference", "position", "ref", "ref_depth", "total_depth", "n_segments", "n_aligned", "freq", "n_segments/n_aligned", "insertions", "deletions", "bases", "r1forward", "r1reverse", "r2forward", "r2reverse", "secondary_alignments", "not_paired"]))
 
 refseq = ""
 orig_name = ""
@@ -25,6 +25,12 @@ for pc in bam.pileup(stepper='samtools', fastafile=ref):
     ins = 0
     starts = 0
     ends = 0
+    secondaries = 0
+    r1forward = 0
+    r1reverse = 0
+    r2reverse = 0
+    r2forward = 0
+    not_paired = 0
 
     d = {'*': 0, 'A': 0, 'C': 0, 'G': 0, 'T': 0, '+': 0, '-': 0, ',': 0, '.': 0, 'N': 0}
     d_total = 0
@@ -33,6 +39,22 @@ for pc in bam.pileup(stepper='samtools', fastafile=ref):
     if ref_base not in d:
         ref_base = 'N'
     for read in pc.pileups:
+        if read.alignment.is_secondary:
+            secondaries += 1
+            continue
+
+        if (not read.alignment.is_reverse) and read.alignment.is_read2:
+            r2forward += 1
+        if (not read.alignment.is_reverse) and read.alignment.is_read1:
+            r1forward += 1
+        if (read.alignment.is_reverse) and read.alignment.is_read2:
+            r2reverse += 1
+        if (read.alignment.is_reverse) and read.alignment.is_read1:
+            r1reverse += 1
+
+        if not read.alignment.is_proper_pair:
+            not_paired += 1
+
         if read.indel < 0:
             dels += 1
 
@@ -68,7 +90,7 @@ for pc in bam.pileup(stepper='samtools', fastafile=ref):
         bases.append(f"{k}:{d[k]}")
     bases = ';'.join(bases)
     if not fastout:
-        print('\t'.join(map(str, [pc.reference_name, pc.reference_pos + 1, ref_base, ref_count, d_total, pc.nsegments, num_aligned, freq, num_aligned / pc.nsegments, ins, dels, bases])))
+        print('\t'.join(map(str, [pc.reference_name, pc.reference_pos + 1, ref_base, ref_count, d_total, pc.nsegments, num_aligned, freq, num_aligned / pc.nsegments, ins, dels, bases, r1forward, r1reverse, r2forward, r2reverse, secondaries, not_paired])))
     else:
         masked[pc.reference_pos] = 'N'
 
