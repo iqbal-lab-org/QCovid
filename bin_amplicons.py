@@ -3,6 +3,7 @@
 
 import sys
 import pysam
+import argparse
 
 # loosen the coordinate interval to cast non-softclipped adapter sequences
 PADDING = 5
@@ -16,7 +17,7 @@ def load_amplicons(amplicon_bed):
         amplicons[fname] = [int(start), int(end)]
     return amplicons
 
-def bin_amplicons(reference, amplicons, bam, filtered=None):
+def bin_amplicons(amplicons, bam, filtered=None):
     histogram = {}
     total = 0
     for amplicon in amplicons:
@@ -24,7 +25,7 @@ def bin_amplicons(reference, amplicons, bam, filtered=None):
 
         # ensure coords are sorted
         rc = 0
-        for read in bam.fetch(reference, start, end):
+        for read in bam.fetch():
             if not read.reference_start or not read.reference_end:
                 continue
             if read.mate_is_unmapped:
@@ -42,28 +43,30 @@ def write_counts(amps_fd, histogram):
         print('\t'.join([a, str(histogram[a])]), file=amps_fd)
     amps_fd.close()
 
+parser = argparse.ArgumentParser(description='Extract amplicon performance stats from name sorted bam')
+parser.add_argument('amplicon_bed', help='bed file of amplicon positions')
+#parser.add_argument('reference', help='fasta reference in same coordinate system as amplicon bed')
+parser.add_argument('bam', help='name sorted bam file input')
+parser.add_argument('--filter', help='write out new bam file with annotated reads')
+
+args = parser.parse_args()
+
 def main():
-    amplicon_bed = sys.argv[1]
-    reference = "MN908947.3"
+    amplicon_set = args.amplicon_bed.split('.bed')[0].split('/')[-1]
 
-    amplicon_set = amplicon_bed.split('.bed')[0].split('/')[-1]
+    bam = pysam.AlignmentFile(args.bam, 'rb')
 
-    basename = sys.argv[2].split('.')[0]
+    filtered = None
+    if args.filter:
+        filtered = pysam.AlignmentFile(args.filter, 'wb', template=bam)
 
-    out_name = f"{basename}.{amplicon_set}.bam"
-    out_amps = f"{basename}.{amplicon_set}.tsv"
-
-    bam = pysam.AlignmentFile(sys.argv[2], 'rb')
-    filtered = pysam.AlignmentFile(out_name, 'wb', template=bam)
-    amplicons = load_amplicons(amplicon_bed)
-    histogram = bin_amplicons(reference, amplicons, bam, filtered=filtered)
+    amplicons = load_amplicons(args.amplicon_bed)
+    histogram = bin_amplicons(amplicons, bam, filtered=filtered)
     total = sum(histogram.values())
 
-    amps_fd = open(out_amps, 'w')
-    summary = '\t'.join([basename, str(total), amplicon_bed, reference])
-    write_counts(amps_fd, histogram)
-    amps_fd.close()
-    print(summary)
+    summary = '\t'.join([args.bam, str(total), args.amplicon_bed, args.reference])
+    write_counts(sys.stdout, histogram)
+    print(summary, sys.stderr)
 
 if __name__ == "__main__":
     main()
