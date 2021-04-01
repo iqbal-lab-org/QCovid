@@ -17,25 +17,64 @@ def load_amplicons(amplicon_bed):
         amplicons[fname] = [int(start), int(end)]
     return amplicons
 
-def bin_amplicons(amplicons, bam, filtered=None):
+def bin_amplicons(amplicons, bam, filtered=None, reference='MN908947'):
     histogram = {}
     total = 0
+    f1r2 = 0
+    f2r1 = 0
+    other = 0
+    print('\t'.join(["#amplicon", "f1r2", "f2r1", "r1f2", "r2f1", "total", "amp50", "amp75", "amp90"]))
+
+    for amplicon in amplicons:
+        histogram[amplicon] = (0,0,0,0,0,0,0,0)
     for amplicon in amplicons:
         start, end = amplicons[amplicon]
 
-        # ensure coords are sorted
-        rc = 0
-        for read in bam.fetch():
-            if not read.reference_start or not read.reference_end:
+        f1r2, f2r1, r1f2, r2f1, amp50, amp75, amp90, total = histogram[amplicon]
+        amplicon_length = end - start
+
+        for read in bam.fetch(reference, start, end):
+            if not read.is_proper_pair: # both mates are mapped
                 continue
-            if read.mate_is_unmapped:
+            if not read.is_read1:
                 continue
-            if read.reference_start > (start - PADDING) and read.reference_end < (end + PADDING) and read.next_reference_start > start:
-                rc += 1
-                if filtered:
-                    filtered.write(read)
-                total += 1
-        histogram[amplicon] = rc
+
+            amp_cov = abs(read.template_length) / amplicon_length
+
+            # branch on template orientation, r1 starts before r2
+            if read.reference_start < read.next_reference_start:
+                mate_end = read.template_length + read.reference_start
+                if read.reference_start >= start and mate_end <= end:
+                    if amp_cov >= 0.5:
+                        amp50 += 1
+                    if amp_cov >= 0.75:
+                        amp75 += 1
+                    if amp_cov >= 0.9:
+                        amp90 += 1
+                    total += 1
+ 
+                    if (not read.is_reverse) and read.mate_is_reverse:
+                        f1r2 += 1 # r1 ===> <=== r2'
+                    elif read.is_reverse and (not read.mate_is_reverse):
+                        r1f2 += 1 # r1' ===> <=== r2
+            else:
+                if read.reference_end <= end and read.next_reference_start >= start:
+                    if amp_cov >= 0.5:
+                        amp50 += 1
+                    if amp_cov >= 0.75:
+                        amp75 += 1
+                    if amp_cov >= 0.9:
+                        amp90 += 1
+                    total += 1
+ 
+                    if (not read.is_reverse) and read.mate_is_reverse:
+                        r2f1 += 1 # r2' ===> <=== r1
+                    elif read.is_reverse and (not read.mate_is_reverse):
+                        f2r1 += 1 # r2 ===> <=== r1'
+ 
+
+        histogram[amplicon] = (f1r2, f2r1, r1f2, r2f1, total, amp50, amp75, amp90)
+        print('\t'.join(list(map(str, [amplicon, f1r2, f2r1, r1f2, r2f1, total, amp50, amp75, amp90]))))
     return histogram
 
 def write_counts(amps_fd, histogram):
@@ -48,6 +87,7 @@ parser.add_argument('amplicon_bed', help='bed file of amplicon positions')
 #parser.add_argument('reference', help='fasta reference in same coordinate system as amplicon bed')
 parser.add_argument('bam', help='name sorted bam file input')
 parser.add_argument('--filter', help='write out new bam file with annotated reads')
+parser.add_argument('--mask', help='write out amplicons which fail QC threshold')
 
 args = parser.parse_args()
 
@@ -62,11 +102,22 @@ def main():
 
     amplicons = load_amplicons(args.amplicon_bed)
     histogram = bin_amplicons(amplicons, bam, filtered=filtered)
-    total = sum(histogram.values())
 
-    summary = '\t'.join([args.bam, str(total), args.amplicon_bed, args.reference])
-    write_counts(sys.stdout, histogram)
-    print(summary, sys.stderr)
+    if args.mask:
+        bad_amps = open(args.mask, 'w')
+        c = 0
+        t = 0.0
+        for amplicon in histogram:
+            _,_,_,_,x,_,_,_ = histogram[amplicon]
+            t += x
+            c += 1
+        avg = t/c
+        
+        for amplicon in histogram:
+            _,_,_,_,x,a50,_,_ = histogram[amplicon]
+            if x < (avg/4) or a50/x < 0.5:
+                print(amplicon, file=bad_amps)
+        bad_amps.close()
 
 if __name__ == "__main__":
     main()
