@@ -1,3 +1,4 @@
+#!/usr/bin/env python3
 """bin reads by amplicon coordinates
 """
 

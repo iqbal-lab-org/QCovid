@@ -1,3 +1,4 @@
+#!/usr/bin/env python3
 """Self-consistent alignment QC.
 This is a wrapper around bamtools' pileup.
 """
