@@ -12,33 +12,45 @@ import hashlib
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
 
-from model import Dataset, Run, Assembly, PrimerSet, Amplicon, SelfQC, AmpliconQC, PairedReads, SingleReads
+from model import (
+    Dataset,
+    Run,
+    Assembly,
+    PrimerSet,
+    Amplicon,
+    SelfQC,
+    AmpliconQC,
+    PairedReads,
+    SingleReads,
+)
 import model
 
-VERSION = '0.0.2'
+VERSION = "0.0.2"
+
 
 def md5(fn):
     hsh = hashlib.md5()
-    with open(fn, 'rb') as fd:
+    with open(fn, "rb") as fd:
         for c in iter(lambda: fd.read(4096), b""):
             hsh.update(c)
     return hsh.hexdigest()
+
 
 def crawl_fastas(session, path, dataset=None):
     """Crawl path for fasta files and load them into database if sample
     name exists
     """
-    missing = set() # count assemblies for runs that don't exist
+    missing = set()  # count assemblies for runs that don't exist
 
     for fa in listdir(path):
-        if fa.endswith('.fa') or fa.endswith('.fasta'):
+        if fa.endswith(".fa") or fa.endswith(".fasta"):
             # test run for whether it exists
-            name = fa.split('.')[0] # everything before the extension
-            ena = name #.split('_')[0]
+            name = fa.split(".")[0]  # everything before the extension
+            ena = name  # .split('_')[0]
             if dataset:
                 name = f"{name}:{dataset}"
- 
-            run = session.query(Run).filter(Run.ena_id==ena).first()
+
+            run = session.query(Run).filter(Run.ena_id == ena).first()
             if not run:
                 missing.add(ena)
                 print(f"sample {ena} not accessioned", file=sys.stderr)
@@ -46,13 +58,15 @@ def crawl_fastas(session, path, dataset=None):
 
             fd = open(f"{path}/{fa}")
             header = fd.readline()
-            if header[0] == '>':
+            if header[0] == ">":
                 desc = header.strip()[1:]
             seq = ""
             bail = False
             for line in fd:
-                if '>' in line:
-                    print(f"invalid fasta file {fa} (multiple entries)", file=sys.stderr)
+                if ">" in line:
+                    print(
+                        f"invalid fasta file {fa} (multiple entries)", file=sys.stderr
+                    )
                     fd.close()
                     bail = True
                     break
@@ -66,6 +80,7 @@ def crawl_fastas(session, path, dataset=None):
             if bail:
                 continue
 
+
 def crawl_ena_download(session, root, project, se=False, pe=False):
     """Crawl a dataset fetched from the ENA using enaBrowserTools:
     `enaGroupGet.py PRJNAxxxxxx -w -f fastq`
@@ -77,7 +92,7 @@ def crawl_ena_download(session, root, project, se=False, pe=False):
     file is single-ended run. 2 or 3 fastq files, where 2 end with _1 and _2
     are interpreted as paired-end.
     """
-    prj = session.query(Dataset).filter(Dataset.ena_id==project).first()
+    prj = session.query(Dataset).filter(Dataset.ena_id == project).first()
     prjroot = path.join(root, project)
     if not prj:
         print(f"Dataset {project} does not exist in database", file=sys.stderr)
@@ -91,16 +106,16 @@ def crawl_ena_download(session, root, project, se=False, pe=False):
     se = 0
     pe = 0
     for sample in listdir(prjroot):
-        if '.txt' in sample:
+        if ".txt" in sample:
             continue
 
         # test that sample has not already been accessioned
-        s = session.query(Run).filter(Run.ena_id==sample).count()
+        s = session.query(Run).filter(Run.ena_id == sample).count()
         if s != 0:
             already_there += 1
             continue
         fq = listdir(path.join(prjroot, sample))
-        
+
         run = Run(ena_id=sample, dataset_id=prj.id)
         prj.runs.append(run)
         session.add(run)
@@ -114,13 +129,13 @@ def crawl_ena_download(session, root, project, se=False, pe=False):
             hsh = md5(f"{prjroot}/{sample}/{fq}")
             se += 1
             reads = SingleReads(run_id=run.id, uri=fq, md5=hsh)
-            #run.se_reads.append(reads)
+            # run.se_reads.append(reads)
             session.add(reads)
             print(f"single,{project},{sample},{fq},{hsh}", file=sys.stderr)
 
         elif len(fq) == 2 or len(fq) == 3 or pe:
             fq1, fq2 = list(sorted(fq))[-2:]
-            if '_1' not in fq1 or '_2' not in fq2:
+            if "_1" not in fq1 or "_2" not in fq2:
                 # unexpected naming convention
                 continue
 
@@ -129,80 +144,100 @@ def crawl_ena_download(session, root, project, se=False, pe=False):
 
             print(f"paired,{project},{fq1},{hsh1},{fq2},{hsh2}", file=sys.stderr)
             pe += 1
-            reads = PairedReads(run_id=run.id, r1_uri=fq1, r1_md5=hsh1, r2_uri=fq2, r2_md5=hsh2)
+            reads = PairedReads(
+                run_id=run.id, r1_uri=fq1, r1_md5=hsh1, r2_uri=fq2, r2_md5=hsh2
+            )
             session.add(reads)
         else:
             continue
 
     session.commit()
-    print(f"added {se} singled end, {pe} paired end reads. skipped {already_there} samples (already accessioned)")
+    print(
+        f"added {se} singled end, {pe} paired end reads. skipped {already_there} samples (already accessioned)"
+    )
+
 
 def dump_assembly(session, sample):
     """Retrieve fasta file for a given sample
     """
-    run = session.query(Run).filter(Run.ena_id==sample).first()
+    run = session.query(Run).filter(Run.ena_id == sample).first()
 
-    for assembly in session.query(Assembly).filter(Assembly.run_id==run.id):
+    for assembly in session.query(Assembly).filter(Assembly.run_id == run.id):
         print(f">{assembly.name} {assembly.description}\n{assembly.sequence}")
 
-def run_self_coverage(session, query, root='./'):
+
+def run_self_coverage(session, query, root="./"):
     """Pass paths to read files for a set of runs to self_coverage pipeline
     """
     no_reads = 0
     has_qc = 0
     score = 0
     for run in query:
-        pe = session.query(PairedReads).filter(PairedReads.run_id==run.id).first()
-        se = session.query(SingleReads).filter(SingleReads.run_id==run.id).first()
+        pe = session.query(PairedReads).filter(PairedReads.run_id == run.id).first()
+        se = session.query(SingleReads).filter(SingleReads.run_id == run.id).first()
 
-        assert not (pe and se) # database integrity error
+        assert not (pe and se)  # database integrity error
 
         if pe:
-            for assembly in session.query(Assembly).filter(Assembly.run_id==run.id):
-                qc = session.query(SelfQC).filter(SelfQC.assembly_id==run.id).first()
+            for assembly in session.query(Assembly).filter(Assembly.run_id == run.id):
+                qc = session.query(SelfQC).filter(SelfQC.assembly_id == run.id).first()
                 if qc:
                     has_qc += 1
                     continue
                 score += 1
-                dataset = session.query(Dataset).filter(Dataset.id==run.dataset_id).first()
-                print(f"self_coverage_PE.sh {assembly.name} {root}/{dataset.ena_id}/{run.ena_id}/{pe.r1_uri} {root}/{dataset.ena_id}/{run.ena_id}/{pe.r2_uri}", file=out)
+                dataset = (
+                    session.query(Dataset).filter(Dataset.id == run.dataset_id).first()
+                )
+                print(
+                    f"self_coverage_PE.sh {assembly.name} {root}/{dataset.ena_id}/{run.ena_id}/{pe.r1_uri} {root}/{dataset.ena_id}/{run.ena_id}/{pe.r2_uri}",
+                    file=out,
+                )
 
         elif se:
             for assembly in run.assemblies:
-            #for assembly in session.query(Assembly).filter(Assembly.run_id==run.id):
-                qc = session.query(SelfQC).filter(SelfQC.assembly_id==run.id).first()
+                # for assembly in session.query(Assembly).filter(Assembly.run_id==run.id):
+                qc = session.query(SelfQC).filter(SelfQC.assembly_id == run.id).first()
                 if qc:
                     has_qc += 1
                     continue
                 score += 1
-                dataset = session.query(Dataset).filter(Dataset.id==run.dataset_id).first()
+                dataset = (
+                    session.query(Dataset).filter(Dataset.id == run.dataset_id).first()
+                )
 
-                print(f"self_coverage_SE.sh {assembly.name} ../projects/{dataset.ena_id}/{run.ena_id}/{se.uri}", file=out)
+                print(
+                    f"self_coverage_SE.sh {assembly.name} ../projects/{dataset.ena_id}/{run.ena_id}/{se.uri}",
+                    file=out,
+                )
 
         else:
             no_reads += 1
-    print(f"No reads for {no_reads} samples. Already had QC data for {has_qc} runs. Ran {score} samples.", file=sys.stderr)
+    print(
+        f"No reads for {no_reads} samples. Already had QC data for {has_qc} runs. Ran {score} samples.",
+        file=sys.stderr,
+    )
+
 
 def import_amplicons(session, bed, name=None):
     """Import amplicons and metadata for a primer set
     """
     amplicons = []
     if name is None:
-        name = bed.split('.')[0].split('/')[-1]
+        name = bed.split(".")[0].split("/")[-1]
 
-    if session.query(PrimerSet).filter(PrimerSet.name==name).first():
+    if session.query(PrimerSet).filter(PrimerSet.name == name).first():
         print(f"primerset {name} already loaded. skipping.")
         return
 
-    pset = PrimerSet(reference='MN908947', name=name, version=VERSION)
+    pset = PrimerSet(reference="MN908947", name=name, version=VERSION)
     session.add(pset)
     session.commit()
     count = 0
     for line in open(bed):
-        if line[0] == '#':
+        if line[0] == "#":
             continue
 
-        n, start, end = line.strip().split('\t')
+        n, start, end = line.strip().split("\t")
         start = int(start)
         end = int(end)
         amplicon = Amplicon(primerset_id=pset.id, name=n, start=start, end=end)
@@ -212,30 +247,36 @@ def import_amplicons(session, bed, name=None):
     print(f"loaded primerset {name}, {count} amplicons")
     session.commit()
 
+
 def import_selfqc(session, fn, name=None):
     fd = open(fn)
-    a_id = fn.split('/')[-1].split('.')[0]
+    a_id = fn.split("/")[-1].split(".")[0]
     if name:
         a_id = name
- 
-    assembly_id = session.query(Assembly).filter(Assembly.name==a_id).first()
+
+    assembly_id = session.query(Assembly).filter(Assembly.name == a_id).first()
     if not assembly_id:
         print(f"assembly for mask {fn}, {a_id} doesn't exist")
         exit(1)
 
-    s_qc = session.query(SelfQC).filter(SelfQC.assembly_id==assembly_id.id).filter(SelfQC.version==VERSION).first()
+    s_qc = (
+        session.query(SelfQC)
+        .filter(SelfQC.assembly_id == assembly_id.id)
+        .filter(SelfQC.version == VERSION)
+        .first()
+    )
     print(f"{assembly_id.id}, {a_id}")
     if s_qc:
         print(f"self_qc row already exists for {fn}, {a_id}")
         exit(1)
 
-    header = fd.readline().split('\t')
+    header = fd.readline().split("\t")
     if len(header) != 12:
         print(f"bad self_qc file header for {fn}")
         exit(1)
-    #reference, position, ref, ref_depth, total_depth, n_segments, n_aligned, freq, freq_aligned, ins, dels, bases = header
+    # reference, position, ref, ref_depth, total_depth, n_segments, n_aligned, freq, freq_aligned, ins, dels, bases = header
     reference, *rest = header
-    if reference != 'reference':
+    if reference != "reference":
         print(f"bad self_qc header row for {fn}: {header}")
         exit(1)
     rows = []
@@ -253,8 +294,8 @@ def import_selfqc(session, fn, name=None):
     bases = 0
 
     for line in fd:
-        row = dict(zip(header, line.split('\t')))
-        f = float(row['n_segments/n_aligned'])
+        row = dict(zip(header, line.split("\t")))
+        f = float(row["n_segments/n_aligned"])
         if f <= 0.95:
             f_95 += 1
         if f <= 0.90:
@@ -268,40 +309,52 @@ def import_selfqc(session, fn, name=None):
         if f <= 0:
             f_00 += 1
 
-        if row['ref'] == 'N':
+        if row["ref"] == "N":
             ns += 1
-        elif row['ref'] == '-':
+        elif row["ref"] == "-":
             dashes += 1
 
-        if int(row['n_segments']) <= 30:
+        if int(row["n_segments"]) <= 30:
             ma_30 += 1
 
         bases += 1
-    sqc_row = SelfQC(assembly_id=assembly_id.id, version=VERSION, f_95=f_95, f_90=f_90, f_85=f_85,\
-            f_75=f_75, f_00=f_00, ma_30=ma_30, ns=ns, dashes=dashes, bases=bases)
+    sqc_row = SelfQC(
+        assembly_id=assembly_id.id,
+        version=VERSION,
+        f_95=f_95,
+        f_90=f_90,
+        f_85=f_85,
+        f_75=f_75,
+        f_00=f_00,
+        ma_30=ma_30,
+        ns=ns,
+        dashes=dashes,
+        bases=bases,
+    )
     print(f"added self qc data for {a_id}, ")
     session.add(sqc_row)
     session.commit()
+
 
 def import_metadata_batch(session, p):
     """Historical: load project metadata from a TSV file
     """
     count = 0
     for l in open(p):
-        _, project, sample, _, _, run_id, project_title, *rest = l.strip().split('\t')
-        if project == 'sample_id':
+        _, project, sample, _, _, run_id, project_title, *rest = l.strip().split("\t")
+        if project == "sample_id":
             continue
-        
-        prjs = session.query(Dataset).filter(Dataset.ena_id==project).first()
+
+        prjs = session.query(Dataset).filter(Dataset.ena_id == project).first()
         if not prjs:
             dataset = Dataset(ena_id=project, project_title=project_title)
             session.add(dataset)
             session.commit()
-        prjs = list(session.query(Dataset).filter(Dataset.ena_id==project))
+        prjs = list(session.query(Dataset).filter(Dataset.ena_id == project))
 
         assert len(prjs) == 1
         prj = prjs[0]
-       
+
         runq = session.query(Run).filter_by(ena_id=run_id).first()
         if not runq:
             run = Run(ena_id=run_id, dataset_id=prj)
@@ -312,6 +365,7 @@ def import_metadata_batch(session, p):
     print(f"adding {count} illumina runs")
     session.commit()
 
+
 def add_amplicon_qc(session, fn, primerset=None):
     """Import results of amplicon QC to database
     """
@@ -319,84 +373,111 @@ def add_amplicon_qc(session, fn, primerset=None):
     skipped = 0
     header = None
     for line in open(fn):
-        if line[0] == '#':
-            _, *header = line.strip().split(',')
+        if line[0] == "#":
+            _, *header = line.strip().split(",")
             continue
 
-        sample, *depths = line.strip().split(',')
+        sample, *depths = line.strip().split(",")
 
-        run = session.query(Run).filter(Run.ena_id==sample).first()
+        run = session.query(Run).filter(Run.ena_id == sample).first()
         if not run:
             continue
 
         for amplicon_name, depth in zip(header, depths):
             depth = int(depth)
-            amplicon = session.query(Amplicon).filter(Amplicon.name==amplicon_name).first()
+            amplicon = (
+                session.query(Amplicon).filter(Amplicon.name == amplicon_name).first()
+            )
             assert amplicon
-            if session.query(AmpliconQC).filter(AmpliconQC.amplicon_id==amplicon.id, AmpliconQC.run_id==run.id, AmpliconQC.version==VERSION).first():
+            if (
+                session.query(AmpliconQC)
+                .filter(
+                    AmpliconQC.amplicon_id == amplicon.id,
+                    AmpliconQC.run_id == run.id,
+                    AmpliconQC.version == VERSION,
+                )
+                .first()
+            ):
                 skipped += 1
                 continue
-            aqc = AmpliconQC(amplicon_id=amplicon.id, run_id=run.id, reads=depth, version=VERSION)
+            aqc = AmpliconQC(
+                amplicon_id=amplicon.id, run_id=run.id, reads=depth, version=VERSION
+            )
             session.add(aqc)
         session.commit()
         count += 1
-    print(f"added amplicon QC for {count} runs (skipped {skipped} QC rows)", file=sys.stderr)
+    print(
+        f"added amplicon QC for {count} runs (skipped {skipped} QC rows)",
+        file=sys.stderr,
+    )
+
 
 def add_self_qc(session, fn):
     """Import results of assembly QC to database
     """
     count = 0
     for line in open(fn):
-        if line[0] == '#':
+        if line[0] == "#":
             continue
-        sample, f_95, f_90, f_80, f_75, f_00, ma_30, ns, dashes = line.strip().split(',')
+        sample, f_95, f_90, f_80, f_75, f_00, ma_30, ns, dashes = line.strip().split(
+            ","
+        )
 
-        run = session.query(Run).filter(Run.ena_id==sample).first()
+        run = session.query(Run).filter(Run.ena_id == sample).first()
         if not run:
             continue
-        assembly = session.query(Assembly).filter(Assembly.run_id==run.id).first()
+        assembly = session.query(Assembly).filter(Assembly.run_id == run.id).first()
         if assembly:
-            qcs = SelfQC(assembly_id=assembly.id, version=VERSION, f_95=int(f_95),\
-                    f_90=int(f_90), f_80=int(f_80), f_75=int(f_75), f_00=int(f_00),\
-                    ma_30 = int(ma_30), ns=int(ns), dashes=int(dashes))
+            qcs = SelfQC(
+                assembly_id=assembly.id,
+                version=VERSION,
+                f_95=int(f_95),
+                f_90=int(f_90),
+                f_80=int(f_80),
+                f_75=int(f_75),
+                f_00=int(f_00),
+                ma_30=int(ma_30),
+                ns=int(ns),
+                dashes=int(dashes),
+            )
             session.add(qcs)
             count += 1
     print(f"added {count} lines of self-QC")
     session.commit()
 
 
-parser = argparse.ArgumentParser(description='QCovid database interface tools')
-parser.add_argument('db')
+parser = argparse.ArgumentParser(description="QCovid database interface tools")
+parser.add_argument("db")
 
-subargs = parser.add_subparsers(dest='command')
+subargs = parser.add_subparsers(dest="command")
 
-init_args = subargs.add_parser('init')
+init_args = subargs.add_parser("init")
 
-prj_args = subargs.add_parser('project')
-prj_args.add_argument('project_id')
-prj_args.add_argument('--title')
+prj_args = subargs.add_parser("project")
+prj_args.add_argument("project_id")
+prj_args.add_argument("--title")
 
-load_args = subargs.add_parser('load')
-load_args.add_argument('dataset')
-load_args.add_argument('--dir', default='./')
-load_args.add_argument('--assemblies')
-load_args.add_argument('--batch', default=None)
+load_args = subargs.add_parser("load")
+load_args.add_argument("dataset")
+load_args.add_argument("--dir", default="./")
+load_args.add_argument("--assemblies")
+load_args.add_argument("--batch", default=None)
 
-run_args = subargs.add_parser('run')
-run_args.add_argument('pipeline')
-run_args.add_argument('--prefix', default='')
+run_args = subargs.add_parser("run")
+run_args.add_argument("pipeline")
+run_args.add_argument("--prefix", default="")
 
-report_args = subargs.add_parser('report')
+report_args = subargs.add_parser("report")
 
-dump_args = subargs.add_parser('fasta')
-dump_args.add_argument('sample')
+dump_args = subargs.add_parser("fasta")
+dump_args.add_argument("sample")
 
-info_args = subargs.add_parser('info')
+info_args = subargs.add_parser("info")
 
-import_args = subargs.add_parser('import')
-import_args.add_argument('--self_qc')
-import_args.add_argument('--amplicon_qc')
-import_args.add_argument('--name')
+import_args = subargs.add_parser("import")
+import_args.add_argument("--self_qc")
+import_args.add_argument("--amplicon_qc")
+import_args.add_argument("--name")
 
 if __name__ == "__main__":
     args = parser.parse_args()
@@ -405,7 +486,7 @@ if __name__ == "__main__":
     Session.configure(bind=engine)
     session = Session()
 
-    if args.command == 'load':
+    if args.command == "load":
         """Crawl ena_data_get directory and import fastq file pairs into database"""
         if args.assemblies:
             # rather, import fastas
@@ -413,15 +494,17 @@ if __name__ == "__main__":
         else:
             crawl_ena_download(session, args.dir, args.dataset)
 
-    elif args.command == 'init':
+    elif args.command == "init":
         """Initialise a QCovid database instance"""
         try:
             model.Base.metadata.create_all(engine)
         except:
-            print(f"Attempting to create database failed for {args.db}", file=sys.stderr)
+            print(
+                f"Attempting to create database failed for {args.db}", file=sys.stderr
+            )
         session = Session()
 
-    elif args.command == 'project':
+    elif args.command == "project":
         # add new project
         prj = session.query(Dataset).filter_by(ena_id=args.project_id).first()
         if not prj:
@@ -434,48 +517,64 @@ if __name__ == "__main__":
         else:
             print(f"Project {args.project_id} already exists", file=sys.stderr)
 
-    elif args.command == 'fasta':
+    elif args.command == "fasta":
         # dump fasta of assemblies for sample
         dump_assembly(session, args.sample)
 
-    elif args.command == 'mask':
+    elif args.command == "mask":
         # dump fasta of assemblies for sample
         dump_mask(session, args.assembly)
 
-    elif args.command == 'import':
+    elif args.command == "import":
         if args.self_qc:
             import_selfqc(session, args.self_qc, name=args.name)
-        #import_metadata_batch(session, p=import_args.tsv)
+        # import_metadata_batch(session, p=import_args.tsv)
 
-    elif args.command == 'run':
+    elif args.command == "run":
         """For each sample with sequence data but no QC data, run pipeline"""
         path = args.prefix
-        if args.pipeline == 'self_qc':
+        if args.pipeline == "self_qc":
             # self qc
-            #print(f"sample,mode,fq")
+            # print(f"sample,mode,fq")
             query = session.query(PairedReads)
             for rp in query:
-                run = session.query(Run).filter(Run.id==rp.run_id).first()
-                project = session.query(Dataset).filter(Dataset.id==run.dataset_id).first()
+                run = session.query(Run).filter(Run.id == rp.run_id).first()
+                project = (
+                    session.query(Dataset).filter(Dataset.id == run.dataset_id).first()
+                )
 
-                if not run: # ????
+                if not run:  # ????
                     continue
                 for assembly in run.assemblies:
-                    qc = session.query(SelfQC).filter(SelfQC.assembly_id==assembly.id).first()
+                    qc = (
+                        session.query(SelfQC)
+                        .filter(SelfQC.assembly_id == assembly.id)
+                        .first()
+                    )
                     if qc:
                         continue
-                    print(f"# {run.ena_id},paired,{args.prefix}{project.ena_id}/{rp.r1_uri},{args.prefix}{project.ena_id}/{rp.r2_uri}")
-                    print(f"bsub -e qc{run.ena_id}.e -o qc{run.ena_id}.o -M4000 -J qc-{run.ena_id} sh self_qc.sh {args.db} {run.ena_id} {args.prefix}{project.ena_id}/{run.ena_id}/{rp.r1_uri} {args.prefix}{project.ena_id}/{run.ena_id}/{rp.r2_uri}")
+                    print(
+                        f"# {run.ena_id},paired,{args.prefix}{project.ena_id}/{rp.r1_uri},{args.prefix}{project.ena_id}/{rp.r2_uri}"
+                    )
+                    print(
+                        f"bsub -e qc{run.ena_id}.e -o qc{run.ena_id}.o -M4000 -J qc-{run.ena_id} sh self_qc.sh {args.db} {run.ena_id} {args.prefix}{project.ena_id}/{run.ena_id}/{rp.r1_uri} {args.prefix}{project.ena_id}/{run.ena_id}/{rp.r2_uri}"
+                    )
 
-        elif args.pipeline == 'bin_amplicons':
-             for rtype in [SingleReads, PairedReads]:
+        elif args.pipeline == "bin_amplicons":
+            for rtype in [SingleReads, PairedReads]:
                 query = session.query(rtype)
                 for rp in query:
                     pass
 
-    elif args.command == 'info':
+    elif args.command == "info":
         """Dump basic stats from database connection"""
-        for name, table in [('datasets', Dataset), ('runs', Run),('assemblies', Assembly),('SE reads', SingleReads),('PE reads', PairedReads)]:
+        for name, table in [
+            ("datasets", Dataset),
+            ("runs", Run),
+            ("assemblies", Assembly),
+            ("SE reads", SingleReads),
+            ("PE reads", PairedReads),
+        ]:
             count = session.query(table).count()
             print(f"{name}:\t{count}")
 
