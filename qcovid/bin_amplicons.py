@@ -18,7 +18,7 @@ def load_amplicons(amplicon_bed):
         amplicons[fname] = [int(start), int(end)]
     return amplicons
 
-def bin_amplicons(amplicons, bam, filtered=None, reference='MN908947'):
+def bin_amplicons(amplicons, bam, filtered=None, reference=None):
     histogram = {}
     total = 0
     f1r2 = 0
@@ -34,7 +34,13 @@ def bin_amplicons(amplicons, bam, filtered=None, reference='MN908947'):
         f1r2, f2r1, r1f2, r2f1, amp50, amp75, amp90, total = histogram[amplicon]
         amplicon_length = end - start
 
-        for read in bam.fetch(reference, start, end):
+        reads = None
+        if reference:
+            reads = bam.fetch(start, end)
+        else:
+            reads = bam.fetch(reference, start, end)
+
+        for read in reads:
             if not read.is_proper_pair: # both mates are mapped
                 continue
             if not read.is_read1:
@@ -89,6 +95,7 @@ parser.add_argument('amplicon_bed', help='bed file of amplicon positions')
 parser.add_argument('bam', help='name sorted bam file input')
 parser.add_argument('--filter', help='write out new bam file with annotated reads')
 parser.add_argument('--mask', help='write out amplicons which fail QC threshold')
+parser.add_argument('-r', '--reference', help='name of contig that reads were mapped to', default=None)
 
 args = parser.parse_args()
 
@@ -102,7 +109,7 @@ def main():
         filtered = pysam.AlignmentFile(args.filter, 'wb', template=bam)
 
     amplicons = load_amplicons(args.amplicon_bed)
-    histogram = bin_amplicons(amplicons, bam, filtered=filtered)
+    histogram = bin_amplicons(amplicons, bam, filtered=filtered, reference=args.reference)
 
     if args.mask:
         bad_amps = open(args.mask, 'w')
