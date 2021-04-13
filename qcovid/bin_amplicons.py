@@ -152,11 +152,14 @@ def main():
             _, _, _, _, x, _, _, _ = histogram[amplicon]
             t += x
             c += 1
-        avg = t / c
+
+        avg = 0.0
+        if c != 0:
+            avg = t / c
 
         for amplicon in histogram:
             _, _, _, _, x, a50, _, _ = histogram[amplicon]
-            if x < (avg / 4) or a50 / x < 0.5:
+            if x == 0 or x < (avg / 4) or (a50 / x) < 0.5:
                 print(amplicon, file=bad_amps)
         bad_amps.close()
 
