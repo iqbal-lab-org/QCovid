@@ -39,7 +39,7 @@ refseq = ""
 orig_name = ""
 for line in open(sys.argv[2]):
     if line[0] == ">":
-        orig_name = line[1:]
+        orig_name = line[1:].strip()
         continue
     refseq += line.strip()
 masked = list(refseq)
