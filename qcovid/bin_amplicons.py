@@ -172,7 +172,7 @@ def main():
         for amplicon in histogram:
             _, _, _, _, coverage, _, a75, _ = histogram[amplicon]
             # if x == 0 or x < (avg / 4) or (a50 / x) < 0.5:
-            if coverage < args.min_coverage or a75 < args.min_template_match - 75:
+            if coverage < args.min_coverage or a75 < args.min_template_match_75 - 75:
                 print(amplicon, file=bad_amps)
         bad_amps.close()
 
