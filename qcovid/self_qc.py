@@ -11,13 +11,16 @@ parser = argparse.ArgumentParser(
 )
 parser.add_argument("assembly", help="target assembly")
 parser.add_argument("reads", help="reads mapped to assembly")
-parser.add_argument("--fasta", help="output masked fasta to stdout", action='store_true')
-parser.add_argument("--variant-threshold", default=0.5, type=float)
+parser.add_argument(
+    "--fasta", help="output masked fasta to stdout", action="store_true"
+)
+parser.add_argument("--freq_threshold", default=0.5, type=float)
+args = parser.parse_args()
 
 
 def main():
-    ref = args.assembly
     bam = pysam.AlignmentFile(args.reads, "rb")
+    ref = pysam.FastaFile(args.assembly)
 
     if not args.fasta:
         print(
@@ -47,13 +50,13 @@ def main():
 
     refseq = ""
     orig_name = ""
-    for line in open(sys.argv[2]):
+    for line in open(args.assembly):
         if line[0] == ">":
             orig_name = line[1:].strip()
             continue
         refseq += line.strip()
     masked = list(refseq)
-
+    print(args.assembly)
     for pc in bam.pileup(stepper="samtools", fastafile=ref):
         dels = 0
         ins = 0
@@ -127,7 +130,7 @@ def main():
         else:
             freq = ref_count / num_aligned
 
-            if freq >= args.variant-threshold:
+            if freq >= args.freq_threshold:
                 continue
 
         bases = []

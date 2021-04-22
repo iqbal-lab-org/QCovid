@@ -124,13 +124,13 @@ parser.add_argument("bam", help="name sorted bam file input")
 parser.add_argument("--filter", help="write out new bam file with annotated reads")
 parser.add_argument("--mask", help="write out amplicons which fail QC threshold")
 parser.add_argument(
-    "--min-coverage",
+    "--min_coverage",
     help="minimum number of read pairs covering an amplicon to pass qc",
     default=25,
     type=int,
 )
 parser.add_argument(
-    "--min-template-match-75",
+    "--min_template_match_75",
     help="percentage of fragments which much cover at least 75% of the template",
     default=0.0,
     type=float,
@@ -172,7 +172,7 @@ def main():
         for amplicon in histogram:
             _, _, _, _, coverage, _, a75, _ = histogram[amplicon]
             # if x == 0 or x < (avg / 4) or (a50 / x) < 0.5:
-            if coverage < args.min - coverage or a75 < args.min - template - match - 75:
+            if coverage < args.min_coverage or a75 < args.min_template_match - 75:
                 print(amplicon, file=bad_amps)
         bad_amps.close()
 
