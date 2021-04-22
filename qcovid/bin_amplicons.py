@@ -6,7 +6,7 @@ import sys
 import pysam
 import argparse
 
-# loosen the coordinate interval to cast non-softclipped adapter sequences
+# loosen the coordinate interval to catch non-softclipped adapter sequences
 PADDING = 5
 
 
@@ -124,6 +124,18 @@ parser.add_argument("bam", help="name sorted bam file input")
 parser.add_argument("--filter", help="write out new bam file with annotated reads")
 parser.add_argument("--mask", help="write out amplicons which fail QC threshold")
 parser.add_argument(
+    "--min-coverage",
+    help="minimum number of read pairs covering an amplicon to pass qc",
+    default=25,
+    type=int,
+)
+parser.add_argument(
+    "--min-template-match-75",
+    help="percentage of fragments which much cover at least 75% of the template",
+    default=0.0,
+    type=float,
+)
+parser.add_argument(
     "-r", "--reference", help="name of contig that reads were mapped to", default=None
 )
 
@@ -158,8 +170,9 @@ def main():
             avg = t / c
 
         for amplicon in histogram:
-            _, _, _, _, x, a50, _, _ = histogram[amplicon]
-            if x == 0 or x < (avg / 4) or (a50 / x) < 0.5:
+            _, _, _, _, coverage, _, a75, _ = histogram[amplicon]
+            # if x == 0 or x < (avg / 4) or (a50 / x) < 0.5:
+            if coverage < args.min - coverage or a75 < args.min - template - match - 75:
                 print(amplicon, file=bad_amps)
         bad_amps.close()
 
