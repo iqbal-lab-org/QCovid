@@ -11,7 +11,7 @@ parser = argparse.ArgumentParser(
 )
 parser.add_argument("assembly", help="target assembly")
 parser.add_argument("reads", help="reads mapped to assembly")
-parser.add_argument("--fasta", help="output masked fasta to stdout", store_const=True)
+parser.add_argument("--fasta", help="output masked fasta to stdout", action='store_true')
 parser.add_argument("--variant-threshold", default=0.5, type=float)
 
 
@@ -127,7 +127,7 @@ def main():
         else:
             freq = ref_count / num_aligned
 
-            if freq >= 0.95:
+            if freq >= args.variant-threshold:
                 continue
 
         bases = []
