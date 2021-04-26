@@ -56,7 +56,6 @@ def main():
             continue
         refseq += line.strip()
     masked = list(refseq)
-    print(args.assembly)
     for pc in bam.pileup(stepper="samtools", fastafile=ref):
         dels = 0
         ins = 0
