@@ -20,6 +20,70 @@ def load_amplicons(amplicon_bed):
     return amplicons
 
 
+def bin_amplicons_se(amplicons, bam, filtered=None, reference=None):
+    histogram = {}
+    total = 0
+    f1r2 = 0
+    f2r1 = 0
+    other = 0
+    print(
+        "\t".join(
+            [
+                "#amplicon",
+                "f1r2",
+                "f2r1",
+                "r1f2",
+                "r2f1",
+                "total",
+                "amp50",
+                "amp75",
+                "amp90",
+            ]
+        )
+    )
+
+    for amplicon in amplicons:
+        histogram[amplicon] = (0, 0, 0, 0, 0, 0, 0, 0)
+    for amplicon in amplicons:
+        start, end = amplicons[amplicon]
+
+        f1r2, f2r1, r1f2, r2f1, amp50, amp75, amp90, total = histogram[amplicon]
+        amplicon_length = end - start
+
+        reads = bam.fetch(reference, start, end)
+
+        for read in reads:
+            amp_cov = abs(read.template_length) / amplicon_length
+
+            read_end = read.template_length + read.reference_start
+            if read.reference_start >= start and read_end <= end:
+                if amp_cov >= 0.5:
+                    amp50 += 1
+                if amp_cov >= 0.75:
+                    amp75 += 1
+                if amp_cov >= 0.9:
+                    amp90 += 1
+                total += 1
+
+                if not read.is_reverse:
+                    f1r2 += 1
+                elif read.is_reverse:
+                    r1f2 += 1  # r1' ===> <=== r2
+
+        histogram[amplicon] = (f1r2, f2r1, r1f2, r2f1, total, amp50, amp75, amp90)
+        print(
+            "\t".join(
+                list(
+                    map(
+                        str,
+                        [amplicon, f1r2, f2r1, r1f2, r2f1, total, amp50, amp75, amp90],
+                    )
+                )
+            )
+        )
+    return histogram
+
+
 def bin_amplicons(amplicons, bam, filtered=None, reference=None):
     histogram = {}
     total = 0
@@ -50,13 +114,10 @@ def bin_amplicons(amplicons, bam, filtered=None, reference=None):
         f1r2, f2r1, r1f2, r2f1, amp50, amp75, amp90, total = histogram[amplicon]
         amplicon_length = end - start
 
-        reads = None
-        if reference:
-            reads = bam.fetch(start, end)
-        else:
-            reads = bam.fetch(reference, start, end)
+        reads = bam.fetch(reference, start, end)
 
         for read in reads:
+
             if not read.is_proper_pair:  # both mates are mapped
                 continue
             if not read.is_read1:
@@ -121,6 +182,12 @@ parser = argparse.ArgumentParser(
 parser.add_argument("amplicon_bed", help="bed file of amplicon positions")
 # parser.add_argument('reference', help='fasta reference in same coordinate system as amplicon bed')
 parser.add_argument("bam", help="name sorted bam file input")
+parser.add_argument(
+    "--se",
+    help="input reads are single-end (Nanopore)",
+    action="store_true",
+    default=False,
+)
 parser.add_argument("--filter", help="write out new bam file with annotated reads")
 parser.add_argument("--mask", help="write out amplicons which fail QC threshold")
 parser.add_argument(
@@ -152,9 +219,15 @@ def main():
         filtered = pysam.AlignmentFile(args.filter, "wb", template=bam)
 
     amplicons = load_amplicons(args.amplicon_bed)
-    histogram = bin_amplicons(
-        amplicons, bam, filtered=filtered, reference=args.reference
-    )
+
+    if args.se:
+        histogram = bin_amplicons_se(
+            amplicons, bam, filtered=filtered, reference=args.reference
+        )
+    else:
+        histogram = bin_amplicons(
+            amplicons, bam, filtered=filtered, reference=args.reference
+        )
 
     if args.mask:
         bad_amps = open(args.mask, "w")
