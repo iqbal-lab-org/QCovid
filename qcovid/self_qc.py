@@ -83,20 +83,27 @@ def main():
         d_total = 0
 
         ref_base = ref.fetch(pc.reference_name, pc.reference_pos, pc.reference_pos + 1)
-        if ref_base not in d:
-            ref_base = "N"
+        assert ref_base in d
+        primer_len = 25  # hack TODO: either max of all primers or lookup
+        # if ref_base not in d:
+        #    ref_base = "N"
         for read in pc.pileups:
+
             if read.alignment.is_secondary:
                 secondaries += 1
                 continue
 
             if (not read.alignment.is_reverse) and read.alignment.is_read2:
+                primer_base = read.query_position > read.query_length - primer_len
                 r2forward += 1
             if (not read.alignment.is_reverse) and read.alignment.is_read1:
+                primer_base = read.query_position > read.query_length - primer_len
                 r1forward += 1
             if (read.alignment.is_reverse) and read.alignment.is_read2:
+                primer_base = read.query_position < primer_len
                 r2reverse += 1
             if (read.alignment.is_reverse) and read.alignment.is_read1:
+                primer_base = read.query_position < primer_len
                 r1reverse += 1
 
             if not read.alignment.is_proper_pair:
@@ -117,14 +124,18 @@ def main():
                 base = read.alignment.query_sequence[read.query_position]
                 if base not in d:
                     base = "N"
-                d[base] += 1
-                d_total += 1
+
+                if not primer_base:
+                    d[base] += 1
+                    d_total += 1
 
         freq = 0.0
         num_aligned = pc.get_num_aligned()
         ref_count = d[ref_base]
         if d_total == 0:
-            # print(pc.reference_pos, "is empty")
+            print(
+                pc.reference_pos, "is empty. entirely inside primer?", file=sys.stderr
+            )
             pass
         else:
             freq = ref_count / num_aligned
