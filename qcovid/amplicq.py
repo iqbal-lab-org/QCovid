@@ -35,11 +35,21 @@ class Primers:
 
 
 def readpairs(fq1, fq2, matchfn):
-    for r1, r2 in zip(mp.fastx_read(fq1), mp.fastx_read(fq2)):
-        yield (*r1, matchfn(r1[1]), (*r2, matchfn(r2[1])))
+    for r1, r2 in zip(
+        mp.fastx_read(fq1, read_comment=True), mp.fastx_read(fq2, read_comment=True)
+    ):
+        yield (*r1, matchfn(r1[1])), (*r2, matchfn(r2[1]))
 
 
 primers = Primers(sys.argv[1])
+aligner = mp.Aligner(sys.argv[2])
 
-for r1 in readpairs(sys.argv[2], sys.argv[3], primers.match):
-    print(r1)
+
+for r1, r2 in readpairs(sys.argv[3], sys.argv[4], primers.match):
+    if r1[3] == None:
+        print("\t", r1[0], r1[3])
+        # for hit in aligner.map(r1[1]):
+
+        #    print("\t{}\t{}\t{}\t{}".format(hit.ctg, hit.r_st, hit.r_en, hit.cigar_str))
+    else:
+        print(r1[0], r1[3])
