@@ -1,6 +1,15 @@
 import mappy as mp
 import sys
 
+from collections import namedtuple
+import argparse
+
+Primer = namedtuple(
+    "Primer", ["amplicon", "name", "left", "forward", "rc", "pos", "length"]
+)
+Read = namedtuple("Read", ["name", "seq", "qual", "comment"])
+Matched = namedtuple("Matched", ["r1", "p1", "r2", "p2"])
+
 
 class Primers:
     def __init__(self, fn):
@@ -21,8 +30,10 @@ class Primers:
             if length < self.min:
                 self.min = length
 
-            _seqs[seq] = (amplicon, name, left, forward, True, pos, length)
-            _seqs[mp.revcomp(seq)] = (amplicon, name, left, forward, False, pos, length)
+            _seqs[seq] = Primer(amplicon, name, left, forward, True, pos, length)
+            _seqs[mp.revcomp(seq)] = Primer(
+                amplicon, name, left, forward, False, pos, length
+            )
 
         for k, v in _seqs.items():
             self.seqs[k[: self.min]] = v
@@ -38,18 +49,32 @@ def readpairs(fq1, fq2, matchfn):
     for r1, r2 in zip(
         mp.fastx_read(fq1, read_comment=True), mp.fastx_read(fq2, read_comment=True)
     ):
-        yield (*r1, matchfn(r1[1])), (*r2, matchfn(r2[1]))
+        r1 = Read(*r1)
+        r2 = Read(*r2)
+        yield Matched(r1, matchfn(r1.seq), r2, matchfn(r2.seq))
 
 
-primers = Primers(sys.argv[1])
-aligner = mp.Aligner(sys.argv[2])
+def main(vargs):
+    primers = Primers(vargs.primers)
+    aligner = mp.Aligner(vargs.ref)
+
+    for match in readpairs(vargs.R1, vargs.R2, primers.match):
+        if match.p1 == None:
+            print("\t", match.r1.name, match.r1.seq)
+            # for hit in aligner.map(r1.seq):
+
+            #    print("\t{}\t{}\t{}\t{}".format(hit.ctg, hit.r_st, hit.r_en, hit.cigar_str))
+        else:
+            print(match.r1.name, match.r1.seq)
 
 
-for r1, r2 in readpairs(sys.argv[3], sys.argv[4], primers.match):
-    if r1[3] == None:
-        print("\t", r1[0], r1[3])
-        # for hit in aligner.map(r1[1]):
-
-        #    print("\t{}\t{}\t{}\t{}".format(hit.ctg, hit.r_st, hit.r_en, hit.cigar_str))
-    else:
-        print(r1[0], r1[3])
+if __name__ == "__main__":
+    parser = argparse.ArgumentParser(
+        description="identify amplicons by primer sequences and alignment positions"
+    )
+    parser.add_argument("ref")
+    parser.add_argument("primers")
+    parser.add_argument("R1")
+    parser.add_argument("R2")
+    args = parser.parse_args()
+    main(args)
