@@ -4,11 +4,19 @@
 `nCoV-nl-primal500-75.bed`. These were extracted from the supplementary materials for [...], provided in `primers/dutch_primal_amplicons.txt` and preprocessed with the script `primers/parse_nl_amplicons.py`. Note that some of these primers were supplied with IUPAC ambiguous nucleotides which may present an issue with locating them in the reference sequence.
 
 ### ARTIC-v3
-`nCoV-artic-v3.bed`. These primers come from a different reference that matches MW075808. Primer 13 LEFT, `TCGCACAAATGTCTACTTAGCTGT`, cannot be located verbatim in MN908947 but appears at position 3771 in the former reference and is homologous to `TCGCACGAAAGTCTACTTAGCTGT` in ours.
+
+Source: https://raw.githubusercontent.com/artic-network/artic-ncov2019/master/primer_schemes/nCoV-2019/V3/nCoV-2019.tsv
 
 `python parse_articv3_amplicons.py > nCoV-artic-v3.bed`
 
-``
+### ARTIC-v4
+
+Source: https://github.com/artic-network/artic-ncov2019/blob/master/primer_schemes/nCoV-2019/V4/SARS-CoV-2.primer.bed
+
+### Midnight-1200
+
+Source: https://docs.google.com/spreadsheets/d/1M5I_C56ZC8_2Ycgm9EFieVlVNqxsP7dXAnGoBZy3nDo/edit#gid=755704891
+
 
 ## Target datasets
 
