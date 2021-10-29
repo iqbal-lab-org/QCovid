@@ -21,7 +21,7 @@ class Primers:
         for l in open(fn):
             amplicon, name, seq, left, forward, pos = l.strip().split(",")
             pos = int(pos)
-            forward = forward.lower() in ["t", "true"]
+            forward = forward.lower() in ["t", "+", "forward", "true"]
             left = left.lower() in ["left", "true", "t"]
 
             length = len(seq)
@@ -60,12 +60,17 @@ def main(vargs):
 
     for match in readpairs(vargs.R1, vargs.R2, primers.match):
         if match.p1 == None:
-            print("\t", match.r1.name, match.r1.seq)
-            # for hit in aligner.map(r1.seq):
-
-            #    print("\t{}\t{}\t{}\t{}".format(hit.ctg, hit.r_st, hit.r_en, hit.cigar_str))
+            # print("\t", match.r1.name, match.r1.seq)
+            for hit in aligner.map(match.r1.seq):
+                print(match.r1.seq)
+                print(
+                    "\t{}\t{}\t{}\t{}".format(
+                        hit.ctg, hit.r_st, hit.r_en, hit.cigar_str
+                    )
+                )
         else:
-            print(match.r1.name, match.r1.seq)
+            # print(match.r1.name, match.r1.seq)
+            pass
 
 
 if __name__ == "__main__":
