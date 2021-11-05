@@ -1,7 +1,7 @@
 import mappy as mp
 import sys
 
-from collections import namedtuple
+from collections import namedtuple, defaultdict
 import argparse
 
 Primer = namedtuple(
@@ -11,8 +11,24 @@ Read = namedtuple("Read", ["name", "seq", "qual", "comment"])
 Matched = namedtuple("Matched", ["r1", "p1", "r2", "p2"])
 
 
+class Stats:
+    def __init__(self):
+        self.total = 0
+        self.neither_match = 0
+        self.r2_only = defaultdict(int)
+        self.r1_only = defaultdict(int)
+
+        self.bad_ends = defaultdict(int)
+
+        self.amplicons = defaultdict(int)
+        self.matches = 0
+        self.mismatch = defaultdict(int)
+        self.mismatch_count = 0
+
+
 class Primers:
     def __init__(self, fn):
+        self.name = fn
         self.min = 100
         self.max = 0
         self.seqs = {}
@@ -54,11 +70,65 @@ def readpairs(fq1, fq2, matchfn):
         yield Matched(r1, matchfn(r1.seq), r2, matchfn(r2.seq))
 
 
-def main(vargs):
-    primers = Primers(vargs.primers)
-    aligner = mp.Aligner(vargs.ref)
+def match_multi(fq1, fq2, primersets):
+    for r1, r2 in zip(
+        mp.fastx_read(fq1, read_comment=True), mp.fastx_read(fq2, read_comment=True)
+    ):
+        r1 = Read(*r1)
+        r2 = Read(*r2)
+        matches = {}
+        for pset in primersets:
+            matches[pset.name] = Matched(r1, pset.match(r1.seq), r2, pset.match(r2.seq))
+        yield r1, r2, matches
 
-    for match in readpairs(vargs.R1, vargs.R2, primers.match):
+
+def main(vargs):
+    primersets = []
+    for pset in vargs.primers.split(","):
+        primersets.append(Primers(pset))
+    aligner = mp.Aligner(vargs.ref)
+    stats = defaultdict(Stats)
+
+    for matches in match_multi(vargs.R1, vargs.R2, primers.match):
+        for pset in matches:
+            m = matches[pset]
+            stats[pset.name].total += 1
+            if not m.p1 and not m.p2:
+                stats[pset.name].neither_match += 1
+                continue
+
+            if not m.p1:
+                stats[pset.name].r2_only[m.p2.name] += 1
+                continue
+
+            if not m.p2:
+                stats[pset.name].r1_only[m.p1.name] += 1
+                continue
+
+            combo = "-".join(list(sorted([m.p1.name, m.p2.name])))
+
+            if m.p1.left == m.p2.left:
+                # both primers are from the same side of the template!
+                stats[pset.name].bad_ends[combo] += 1
+                continue
+
+            if m.p1.amplicon == m.p2.amplicon:
+                # good amplicon match
+                stats[pset.name].amplicons[m.p1.amplicon] += 1
+                stats[pset.name].matches += 1
+                continue
+            else:
+                # mispriming
+                stats[pset.name].mismatch[combo] += 1
+                stats[pset.name].mismatch_count += 1
+
+        continue
+    for pset in stats:
+        print(pset, stats[pset].total)
+
+
+def match_remainder(match, aligner):
+    if False:
         if match.p1 == None:
             # print("\t", match.r1.name, match.r1.seq)
             for hit in aligner.map(match.r1.seq):
