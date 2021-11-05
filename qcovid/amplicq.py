@@ -35,7 +35,7 @@ class Primers:
         _seqs = {}
 
         for l in open(fn):
-            amplicon, name, seq, left, forward, pos = l.strip().split(",")
+            amplicon, name, seq, left, forward, pos = l.strip().split("\t")
             pos = int(pos)
             forward = forward.lower() in ["t", "+", "forward", "true"]
             left = left.lower() in ["left", "true", "t"]
@@ -89,42 +89,41 @@ def main(vargs):
     aligner = mp.Aligner(vargs.ref)
     stats = defaultdict(Stats)
 
-    for matches in match_multi(vargs.R1, vargs.R2, primers.match):
+    for r1, r2, matches in match_multi(vargs.R1, vargs.R2, primersets):
         for pset in matches:
             m = matches[pset]
-            stats[pset.name].total += 1
+            stats[pset].total += 1
             if not m.p1 and not m.p2:
-                stats[pset.name].neither_match += 1
+                stats[pset].neither_match += 1
                 continue
 
             if not m.p1:
-                stats[pset.name].r2_only[m.p2.name] += 1
+                stats[pset].r2_only[m.p2.name] += 1
                 continue
 
             if not m.p2:
-                stats[pset.name].r1_only[m.p1.name] += 1
+                stats[pset].r1_only[m.p1.name] += 1
                 continue
 
             combo = "-".join(list(sorted([m.p1.name, m.p2.name])))
 
             if m.p1.left == m.p2.left:
                 # both primers are from the same side of the template!
-                stats[pset.name].bad_ends[combo] += 1
+                stats[pset].bad_ends[combo] += 1
                 continue
 
             if m.p1.amplicon == m.p2.amplicon:
                 # good amplicon match
-                stats[pset.name].amplicons[m.p1.amplicon] += 1
-                stats[pset.name].matches += 1
+                stats[pset].amplicons[m.p1.amplicon] += 1
+                stats[pset].matches += 1
                 continue
             else:
                 # mispriming
-                stats[pset.name].mismatch[combo] += 1
-                stats[pset.name].mismatch_count += 1
+                stats[pset].mismatch[combo] += 1
+                stats[pset].mismatch_count += 1
 
-        continue
     for pset in stats:
-        print(pset, stats[pset].total)
+        print(pset, stats[pset].matches, stats[pset].mismatch_count, stats[pset].total)
 
 
 def match_remainder(match, aligner):
@@ -132,7 +131,6 @@ def match_remainder(match, aligner):
         if match.p1 == None:
             # print("\t", match.r1.name, match.r1.seq)
             for hit in aligner.map(match.r1.seq):
-                print(match.r1.seq)
                 print(
                     "\t{}\t{}\t{}\t{}".format(
                         hit.ctg, hit.r_st, hit.r_en, hit.cigar_str
