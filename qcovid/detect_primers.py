@@ -1,5 +1,6 @@
 import mappy as mp
 import sys
+import json
 
 from collections import namedtuple, defaultdict
 import argparse
@@ -88,8 +89,9 @@ def main(vargs):
         primersets.append(Primers(pset))
     aligner = mp.Aligner(vargs.ref)
     stats = defaultdict(Stats)
-
+    total = 0
     for r1, r2, matches in match_multi(vargs.R1, vargs.R2, primersets):
+        total += 1
         for pset in matches:
             m = matches[pset]
             stats[pset].total += 1
@@ -122,8 +124,52 @@ def main(vargs):
                 stats[pset].mismatch[combo] += 1
                 stats[pset].mismatch_count += 1
 
+    if total == 0:
+        if args.json:
+            print(json.dumps({"status": "failure", "message": "no reads in input"}))
+        print("No reads in input", file=sys.stderr)
+        exit(1)
+
+    firstn = None
+    secondn = None
+    first = 0
+    second = 0
     for pset in stats:
-        print(pset, stats[pset].matches, stats[pset].mismatch_count, stats[pset].total)
+        print(
+            pset,
+            stats[pset].matches,
+            stats[pset].mismatch_count,
+            stats[pset].total,
+            file=sys.stderr,
+        )
+        ms = stats[pset].matches
+
+        if ms >= first:
+            firstn = pset
+            first = ms
+
+        if ms >= second and ms < first:
+            secondn = pset
+            second = ms
+
+    f = first / total
+    s = second / total
+
+    if f >= 0.7 and s <= 0.3:
+        results = {"status": "success", "read_pairs": total, "primer_set": firstn}
+        print(f"selected primerset {firstn}", file=sys.stderr)
+        if args.json:
+            print(json.dumps(results))
+        exit(0)
+
+    results = {
+        "status": "failure",
+        "read_pairs": total,
+        "message": "ambiguous primer set",
+    }
+    if args.json:
+        print(json.dumps(results))
+    exit(1)
 
 
 def match_remainder(match, aligner):
@@ -145,6 +191,7 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser(
         description="identify amplicons by primer sequences and alignment positions"
     )
+    parser.add_argument("--json", required=False, action="store_true")
     parser.add_argument("ref")
     parser.add_argument("primers")
     parser.add_argument("R1")
