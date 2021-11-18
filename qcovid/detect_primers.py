@@ -7,7 +7,7 @@ import json
 from collections import namedtuple, defaultdict
 import argparse
 
-from primers import Primer, Primers, Read, Matched, print_read
+from qcovid.primers import Primer, Primers, Read, Matched, print_read
 
 
 class Stats:
