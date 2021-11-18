@@ -34,6 +34,16 @@ def readpairs(fq1, fq2, matchfn):
         yield Matched(r1, matchfn(r1.seq), r2, matchfn(r2.seq))
 
 
+def match_single(fq, primersets):
+    for r in mp.fastx_read(fq, read_comment=True):
+        r = Read(*r)
+        rc = mp.revcomp(r.seq)
+        matches = {}
+        for pset in primersets:
+            matches[pset.name] = Matched(r, pset.match(r.seq), r, pset.match(rc))
+        yield r, matches
+
+
 def match_multi(fq1, fq2, primersets):
     for r1, r2 in zip(
         mp.fastx_read(fq1, read_comment=True), mp.fastx_read(fq2, read_comment=True)
@@ -47,13 +57,129 @@ def match_multi(fq1, fq2, primersets):
 
 
 def main(vargs):
+
+    if len(vargs.reads) == 2:
+        paired(vargs)
+    elif len(vargs.reads) == 1:
+        single(vargs)
+
+
+def single(vargs):
+    R1 = vargs.reads[0]
     primersets = []
     for pset in vargs.primers.split(","):
         primersets.append(Primers(pset))
     aligner = mp.Aligner(vargs.ref)
     stats = defaultdict(Stats)
     total = 0
-    for r1, r2, matches in match_multi(vargs.R1, vargs.R2, primersets):
+    for r, matches in match_single(R1, primersets):
+        total += 1
+        match_mode = "unmatched"
+        combo = None
+
+        for pset in matches:
+            m = matches[pset]
+            stats[pset].total += 1
+            if not m.p1 and not m.p2:
+                stats[pset].neither_match += 1
+                match_mode = "no_match"
+                continue
+
+            if not m.p1:
+                stats[pset].r2_only[m.p2.name] += 1
+                match_mode = "no_left"
+                continue
+
+            if not m.p2:
+                stats[pset].r1_only[m.p1.name] += 1
+                match_mode = "no_right"
+                continue
+
+            combo = "-".join(list(sorted([m.p1.name, m.p2.name])))
+
+            if m.p1.left == m.p2.left:
+                # both primers are from the same side of the template!
+                stats[pset].bad_ends[combo] += 1
+                match_mode = "same_side"
+                continue
+
+            if m.p1.amplicon == m.p2.amplicon:
+                # good amplicon match
+                stats[pset].amplicons[m.p1.amplicon] += 1
+                stats[pset].matches += 1
+                match_mode = "exact"
+                continue
+            else:
+                # mispriming
+                stats[pset].mismatch[combo] += 1
+                stats[pset].mismatch_count += 1
+                match_mode = "mismatch"
+
+        if vargs.prefix:
+            if match_mode not in ["exact"] and filter_reads:
+                continue
+
+            r.name += f" qcovid-v0.1:{combo}:{match_mode}:{plen}"
+
+            print_read(r, file=r1fd)
+
+    if total == 0:
+        if args.json:
+            print(json.dumps({"status": "failure", "message": "no reads in input"}))
+        print("No reads in input", file=sys.stderr)
+        exit(0)
+
+    firstn = None
+    secondn = None
+    first = 0
+    second = 0
+    for pset in stats:
+        print(
+            pset,
+            stats[pset].matches,
+            stats[pset].mismatch_count,
+            stats[pset].total,
+            file=sys.stderr,
+        )
+        ms = stats[pset].matches
+
+        if ms >= first:
+            firstn = pset
+            first = ms
+
+        if ms >= second and ms < first:
+            secondn = pset
+            second = ms
+
+    f = first / total
+    s = second / total
+
+    if f >= 0.7 and s <= 0.3:
+        results = {"status": "success", "read_pairs": total, "primer_set": firstn}
+        print(f"selected primerset {firstn}", file=sys.stderr)
+        if args.json:
+            print(json.dumps(results))
+        exit(0)
+
+    results = {
+        "status": "failure",
+        "read_pairs": total,
+        "message": "ambiguous primer set",
+    }
+    if args.json:
+        print(json.dumps(results))
+    exit(0)
+
+
+def paired(vargs):
+    R1, R2 = vargs.reads
+    primersets = []
+    for pset in vargs.primers.split(","):
+        primersets.append(Primers(pset))
+    aligner = mp.Aligner(vargs.ref)
+    stats = defaultdict(Stats)
+    total = 0
+    for r1, r2, matches in match_multi(R1, R2, primersets):
         total += 1
         match_mode = "unmatched"
         combo = None
@@ -176,7 +302,6 @@ if __name__ == "__main__":
     parser.add_argument("--prefix", required=False)
     parser.add_argument("ref")
     parser.add_argument("primers")
-    parser.add_argument("R1")
-    parser.add_argument("R2")
+    parser.add_argument("reads", nargs="+")
     args = parser.parse_args()
     main(args)
