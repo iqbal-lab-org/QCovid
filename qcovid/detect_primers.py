@@ -1,3 +1,5 @@
+#!/usr/bin/env python3
+
 import mappy as mp
 import sys
 import json
