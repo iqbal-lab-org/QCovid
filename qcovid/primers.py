@@ -1,10 +1,18 @@
+import sys
 from collections import namedtuple, defaultdict
+
+import mappy as mp
 
 Primer = namedtuple(
     "Primer", ["amplicon", "name", "left", "forward", "rc", "pos", "length"]
 )
 Read = namedtuple("Read", ["name", "seq", "qual", "comment"])
 Matched = namedtuple("Matched", ["r1", "p1", "r2", "p2"])
+
+
+def print_read(read):
+    head = " ".join([read.name, read.comment])
+    return f"{head}\n{seq}\n+\n{qual}"
 
 
 class ReadData:
@@ -15,7 +23,7 @@ class ReadData:
             d = data.split(":")
             if "qcovid-v0.1" in d:
                 _, amplicon, good, primer_start = d
-                if amplicon = "NO_MATCH":
+                if amplicon in ["NO_MATCH", "None"]:
                     self.amplicon = None
                 else:
                     self.amplicon = amplicon

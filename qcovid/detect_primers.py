@@ -5,7 +5,7 @@ import json
 from collections import namedtuple, defaultdict
 import argparse
 
-from primers import Primer, Primers, Read, Matched
+from primers import Primer, Primers, Read, Matched, print_read
 
 
 class Stats:
@@ -53,7 +53,7 @@ def main(vargs):
     total = 0
     for r1, r2, matches in match_multi(vargs.R1, vargs.R2, primersets):
         total += 1
-        good = False
+        match_mode = "unmatched"
         combo = None
 
         for pset in matches:
@@ -65,10 +65,12 @@ def main(vargs):
 
             if not m.p1:
                 stats[pset].r2_only[m.p2.name] += 1
+                match_mode = "no_r1"
                 continue
 
             if not m.p2:
                 stats[pset].r1_only[m.p1.name] += 1
+                match_mode = "no_r2"
                 continue
 
             combo = "-".join(list(sorted([m.p1.name, m.p2.name])))
@@ -76,21 +78,30 @@ def main(vargs):
             if m.p1.left == m.p2.left:
                 # both primers are from the same side of the template!
                 stats[pset].bad_ends[combo] += 1
+                match_mode = "same_side"
                 continue
 
             if m.p1.amplicon == m.p2.amplicon:
                 # good amplicon match
                 stats[pset].amplicons[m.p1.amplicon] += 1
                 stats[pset].matches += 1
+                match_mode = "exact"
                 continue
             else:
                 # mispriming
                 stats[pset].mismatch[combo] += 1
                 stats[pset].mismatch_count += 1
+                match_mode = "mismatch"
 
-        if write_out:
-            r1.name += f" qcovid-v0.1:{combo}:{good}:{plen}"
-            r2.name += f" qcovid-v0.1:{combo}:{good}:{plen}"
+        if vargs.prefix:
+            if match_mode not in ["exact"] and filter_reads:
+                continue
+
+            r1.name += f" qcovid-v0.1:{combo}:{match_mode}:{plen}"
+            r2.name += f" qcovid-v0.1:{combo}:{match_mode}:{plen}"
+
+            print_read(r1, file=r1fd)
+            print_read(r2, file=r1fd)
 
     if total == 0:
         if args.json:
@@ -160,6 +171,7 @@ if __name__ == "__main__":
         description="identify amplicons by primer sequences and alignment positions"
     )
     parser.add_argument("--json", required=False, action="store_true")
+    parser.add_argument("--prefix", required=False)
     parser.add_argument("ref")
     parser.add_argument("primers")
     parser.add_argument("R1")
