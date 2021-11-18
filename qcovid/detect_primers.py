@@ -109,7 +109,7 @@ def main(vargs):
         if args.json:
             print(json.dumps({"status": "failure", "message": "no reads in input"}))
         print("No reads in input", file=sys.stderr)
-        exit(1)
+        exit(0)
 
     firstn = None
     secondn = None
@@ -150,7 +150,7 @@ def main(vargs):
     }
     if args.json:
         print(json.dumps(results))
-    exit(1)
+    exit(0)
 
 
 def match_remainder(match, aligner):
