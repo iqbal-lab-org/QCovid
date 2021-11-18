@@ -88,23 +88,32 @@ def main():
         # if ref_base not in d:
         #    ref_base = "N"
         for read in pc.pileups:
+            if not read.alignment.cigartuples:
+                # unmapped read
+                continue
 
             if read.alignment.is_secondary:
                 secondaries += 1
                 continue
 
-            if (not read.alignment.is_reverse) and read.alignment.is_read2:
-                primer_base = read.query_position > read.query_length - primer_len
-                r2forward += 1
-            if (not read.alignment.is_reverse) and read.alignment.is_read1:
-                primer_base = read.query_position > read.query_length - primer_len
-                r1forward += 1
-            if (read.alignment.is_reverse) and read.alignment.is_read2:
-                primer_base = read.query_position < primer_len
-                r2reverse += 1
-            if (read.alignment.is_reverse) and read.alignment.is_read1:
-                primer_base = read.query_position < primer_len
-                r1reverse += 1
+            try:
+                if (not read.alignment.is_reverse) and read.alignment.is_read2:
+                    primer_base = read.query_position > read.query_length - primer_len
+                    r2forward += 1
+                if (not read.alignment.is_reverse) and read.alignment.is_read1:
+                    primer_base = read.query_position > read.query_length - primer_len
+                    r1forward += 1
+                if (read.alignment.is_reverse) and read.alignment.is_read2:
+                    primer_base = read.query_position < primer_len
+                    r2reverse += 1
+                if (read.alignment.is_reverse) and read.alignment.is_read1:
+                    primer_base = read.query_position < primer_len
+                    r1reverse += 1
+            except AttributeError as e:
+                # pysam needs to be removed from this project
+                # I think
+                # print(f"warning: {e}", file=sys.stderr)
+                continue
 
             if not read.alignment.is_proper_pair:
                 not_paired += 1
