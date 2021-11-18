@@ -5,11 +5,7 @@ import json
 from collections import namedtuple, defaultdict
 import argparse
 
-Primer = namedtuple(
-    "Primer", ["amplicon", "name", "left", "forward", "rc", "pos", "length"]
-)
-Read = namedtuple("Read", ["name", "seq", "qual", "comment"])
-Matched = namedtuple("Matched", ["r1", "p1", "r2", "p2"])
+from primers import Primer, Primers, Read, Matched
 
 
 class Stats:
@@ -25,41 +21,6 @@ class Stats:
         self.matches = 0
         self.mismatch = defaultdict(int)
         self.mismatch_count = 0
-
-
-class Primers:
-    def __init__(self, fn):
-        self.name = fn
-        self.min = 100
-        self.max = 0
-        self.seqs = {}
-        _seqs = {}
-
-        for l in open(fn):
-            amplicon, name, seq, left, forward, pos = l.strip().split("\t")
-            pos = int(pos)
-            forward = forward.lower() in ["t", "+", "forward", "true"]
-            left = left.lower() in ["left", "true", "t"]
-
-            length = len(seq)
-            if length > self.max:
-                self.max = length
-            if length < self.min:
-                self.min = length
-
-            _seqs[seq] = Primer(amplicon, name, left, forward, True, pos, length)
-            _seqs[mp.revcomp(seq)] = Primer(
-                amplicon, name, left, forward, False, pos, length
-            )
-
-        for k, v in _seqs.items():
-            self.seqs[k[: self.min]] = v
-
-    def match(self, seq):
-        if seq[: self.min] in self.seqs:
-            return self.seqs[seq[: self.min]]
-        else:
-            return None
 
 
 def readpairs(fq1, fq2, matchfn):
@@ -92,6 +53,9 @@ def main(vargs):
     total = 0
     for r1, r2, matches in match_multi(vargs.R1, vargs.R2, primersets):
         total += 1
+        good = False
+        combo = None
+
         for pset in matches:
             m = matches[pset]
             stats[pset].total += 1
@@ -123,6 +87,10 @@ def main(vargs):
                 # mispriming
                 stats[pset].mismatch[combo] += 1
                 stats[pset].mismatch_count += 1
+
+        if write_out:
+            r1.name += f" qcovid-v0.1:{combo}:{good}:{plen}"
+            r2.name += f" qcovid-v0.1:{combo}:{good}:{plen}"
 
     if total == 0:
         if args.json:
