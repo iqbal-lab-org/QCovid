@@ -3,6 +3,11 @@ import mappy
 
 #a = mappy.Aligner(sys.argv[1])
 
+poss = {}
+for line in open('artic-v3.bed'):
+    _, start, end, name, _, _ = line.strip().split()
+    poss[name] = (start, end)
+
 for line in open('artic-v3.tsv'):
     name, amplicon, seq, *r = line.strip().split('\t')
     if name == "name":
@@ -17,5 +22,5 @@ for line in open('artic-v3.tsv'):
     amplicon = '_'.join(r[:2])
     left = d == "LEFT"
     forward = d == "LEFT"
-    pos = 0
+    pos = poss[name][0]
     print('\t'.join([amplicon, name, seq, str(left), str(forward), str(pos)]))
